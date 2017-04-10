@@ -1,0 +1,14 @@
+{
+    "font_size": 50,
+    "sizes": {
+        "pause_window": [400, 600]
+    },
+    "positions": {
+        "pause_text": [10, 10],
+        "pause_window": [312, 84],
+        "buttons":  { 
+            "return": [449, 120],
+            "exit": [449, 540]
+        }
+    }
+}

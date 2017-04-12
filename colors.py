@@ -24,13 +24,13 @@ class Color:
 
     lPink =     (255, 200, 240)
 
-    colors = ["BLACK", "WHITE",
-              "LGRAY", "GRAY", "DGRAY",
-              "RED", "GREEN", "BLUE",
-              "YELLOW", "CYAN", "PURPLEW",
-              "MAGENTA", "PINK", "PURPLE",
-              "LBLUE", "DBLUE", "EBLUE",
-              "LPINK"]
+    colors = ["Black", "White",
+              "lGray", "Gray", "dGray",
+              "Red", "Green", "Blue",
+              "Yellow", "Cyan", "Purple2",
+              "Magenta", "Pink", "Purple",
+              "lBlue", "dBlue", "eBlue",
+              "lPink"]
     
     @classmethod
     def with_alpha(self, alpha):

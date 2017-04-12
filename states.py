@@ -9,12 +9,16 @@ from abc_state import AbstractGameState
 import levels
 from colors import Color
 import mapgen
-
 from libraries import mazegen
 
 TOPLEFT = (0, 0)
 
 MAZESIZE = (10, 10)
+
+reverse_directions = {"left": "right", "right": "left", 
+                      "up": "down", "down": "up"}
+directions_base = {"left": "left", "right": "right", 
+                  "top": "up", "bottom": "down"}
 
 # ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 # ===== ===== =====        Test State       ===== ===== =====
@@ -154,8 +158,6 @@ class MainMenuState(AbstractGameState):
             self.start_game()
 
     def draw(self, screen):
-        screen.fill(Color.Black)
-
         screen.blit(self.background, TOPLEFT)
 
         screen.blit(self.title_text, self.config["positions"]["title_text"])
@@ -294,7 +296,8 @@ class DungeonState(AbstractGameState):
     config = json.load(open("configs/dungeon.json", "r"))
     tile_size = config["tile_size"]
     pos_fix = config["level_surface_position"]
-    def __init__(self, game, *, level, entry_dir="any", player=None):
+    config_ui = json.load(open("configs/playerui.json"))
+    def __init__(self, game, *, level, entry_dir="any", player=None, run_interlude=False):
         super().__init__(game)
 
         self.level = level
@@ -332,27 +335,153 @@ class DungeonState(AbstractGameState):
         self.player.update()
         if self.player.going_through_door:
             self.player.going_through_door = False
-            passage = self.player.near_passage
-            direction = self.level.start_entries_rev[passage.index]
-            mx, my = self.game.vars["player_mazepos"]
-            if direction == "left":     mx -= 1
-            elif direction == "right":  mx += 1
-            elif direction == "top":    my -= 1
-            elif direction == "bottom": my += 1
-            newlevel = self.game.vars["map"][my][mx]
-            print(self.game.vars["player_mazepos"], "-->", (mx, my))
-            self.game.vars["player_mazepos"] = (mx, my)
-            opposite_dir = levels.opposite_dirs[direction]
+            self.handle_level_travel()
+
+    def draw(self, screen, *, dlevel=True, dplayer=True, dui=True, dborder=True):
+        if dlevel:      
+            self.level.draw(screen, self.pos_fix)
+
+        if dplayer:     
+            self.player.draw(screen, self.pos_fix)
+        elif not dplayer and dui:
+            self.player.draw_ui(screen, self.pos_fix)
+
+        if dborder:     
+            screen.blit(self.border, TOPLEFT)
+
+
+    def handle_level_travel(self):
+        passage = self.player.near_passage
+        direction = self.level.start_entries_rev[passage.index]
+        mx, my = self.game.vars["player_mazepos"]
+        if direction == "left":     mx -= 1
+        elif direction == "right":  mx += 1
+        elif direction == "top":    my -= 1
+        elif direction == "bottom": my += 1
+        newlevel = self.game.vars["map"][my][mx]
+        print(self.game.vars["player_mazepos"], "-->", (mx, my), "dir:", direction)
+        self.game.vars["player_mazepos"] = (mx, my)
+        opposite_dir = levels.opposite_dirs[direction]
+
+        self.game.pop_state()
+        self.cleanup()
+        new_state = DungeonState(self.game, level=newlevel(), entry_dir=opposite_dir, 
+                                 player=self.player, run_interlude=True)
+        ssize = self.game.vars["screen"].get_size()
+        levelcrop = pygame.Rect(self.config["level_surface_position"], self.config["level_surface_size"])
+        topbarcrop = pygame.Rect(self.config["topbar_position"], self.config["topbar_size"])
+        surface1 = pygame.Surface(ssize)
+        self.draw(surface1, dplayer=False, dborder=False)
+        surface1 = surface1.subsurface(levelcrop)
+        surface2 = pygame.Surface(ssize)
+        new_state.draw(surface2, dplayer=False, dui=True, dborder=False)
+        topbar = surface2.subsurface(topbarcrop)
+        surface2 = surface2.subsurface(levelcrop)
+
+        interlude_way = reverse_directions[directions_base[direction]]
+        static_elems = [(self.config["topbar_position"], topbar)]
+        interlude = InterludeState(self.game, first=surface1, second=surface2, way=interlude_way, 
+                                   static_elems=static_elems, fix=self.config["level_surface_position"])
+        self.game.push_state(new_state)
+        self.game.push_state(interlude)
+
+# ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+# ===== ===== =====     Interlude State     ===== ===== =====
+# ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+# Note: This state draws the current surface and then moves
+# to the next one, and thus requires 'first',
+# 'second' and 'way' keyword arguments. 
+# The 'way' argument is a string: either 
+# "left", "right", "up" or "down".
+# The 'speed' keyword argument is optional, default 4. 
+
+class InterludeState(AbstractGameState):
+    def __init__(self, game, *, first, second, way, speed=3, static_elems=[], fix=(0, 0)):
+        super().__init__(game)
+
+        self.first, self.second = first, second
+        self.way, self.speed = way, speed
+        self.static_elems = static_elems
+        self.fix = fix
+
+        assert self.way in ("left", "right", "up", "down")
+        first_w, first_h = self.first.get_size()
+        second_w, second_h = self.second.get_size()
+        if self.way == "left" or self.way == "right":
+            surface_size = (first_w + second_w,
+                            max(first_h, second_h))
+        else:
+            surface_size = (max(first_w, second_w),
+                            first_h + second_h)
+        self.surface = pygame.Surface(surface_size)
+        self.rect = self.surface.get_rect()
+
+        if self.way == "left":
+            self.rect.x = 0
+            self.surface.blit(self.first, (0, 0))
+            self.surface.blit(self.second, (first_w, 0))
+            self.ticks_left = first_w // speed
+        elif self.way == "right":
+            self.rect.x = -self.second.get_width()
+            self.surface.blit(self.second, (0, 0))
+            self.surface.blit(self.first, (second_w, 0))
+            self.ticks_left = second_w // speed
+        elif self.way == "up":
+            self.rect.y = 0
+            self.surface.blit(self.first, (0, 0))
+            self.surface.blit(self.second, (0, first_h))
+            self.ticks_left = first_h // speed
+        elif self.way == "down":
+            self.rect.y = -self.second.get_height()
+            self.surface.blit(self.second, (0, 0))
+            self.surface.blit(self.first, (0, second_h))
+            self.ticks_left = second_h // speed
+
+    def cleanup(self):
+        super().cleanup()
+
+    def pause(self):
+        super().pause()
+
+    def resume(self):
+        super().resume()
+
+    def handle_events(self, events, pressed_keys, mouse_pos):
+        pass
+
+    def update(self):
+        if self.way == "left":
+            self.rect.x -= self.speed
+        elif self.way == "right":
+            self.rect.x += self.speed
+        elif self.way == "up":
+            self.rect.y -= self.speed
+        elif self.way == "down":
+            self.rect.y += self.speed
+        self.ticks_left -= 1
+        if self.ticks_left == 0:
+            if self.way == "left":
+                self.rect.x = -self.first.get_width()
+            elif self.way == "right":
+                self.rect.x = 0
+            elif self.way == "up":
+                self.rect.y = -self.first.get_height()
+            elif self.way == "down":
+                self.rect.y = 0
+        if self.ticks_left == -1:
             self.game.pop_state()
             self.cleanup()
-            self.game.push_state(DungeonState(self.game, level=newlevel(), entry_dir=opposite_dir, player=self.player))
-
 
     def draw(self, screen):
-        screen.fill(Color.Black)
-        self.level.draw(screen, self.pos_fix)
-        self.player.draw(screen, self.pos_fix)
-        screen.blit(self.border, TOPLEFT)
+        if self.fix == (0, 0):
+            screen.blit(self.surface, self.rect)
+        else:
+            screen.blit(self.surface, (self.rect.x + self.fix[0], self.rect.y + self.fix[1]))
+        for pos, surface in self.static_elems:
+            screen.blit(surface, pos)
+
+
+# ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 
 
 class _FakeGame:

@@ -35,3 +35,7 @@ class GameEngine:
 
     def draw(self, state, screen, *args, **kwargs):
         return state.draw(screen, *args, **kwargs)
+
+    @property
+    def states_str(self):
+        return [type(state).__name__ for state in self.state_stack]

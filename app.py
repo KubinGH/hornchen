@@ -2,17 +2,26 @@ import cProfile, pstats
 
 import pygame
 
+WINDOW_SIZE = (1024, 768)
+# We need to create a screen before importing so that a video mode is set,
+# and we are able to .convert() images.
+pygame.init()
+screen = pygame.display.set_mode(WINDOW_SIZE, pygame.DOUBLEBUF)
+
 import game
 import states
 import fontutils
 from colors import Color
 
-WINDOW_SIZE = (1024, 768)
+MAP_SIZE = (10, 10)
 
 MAX_FPS = 0
 
 def alt_pressed(pressed_keys):
     return pressed_keys[pygame.K_LALT] or pressed_keys[pygame.K_RALT]
+
+def shift_pressed(pressed_keys):
+    return pressed_keys[pygame.K_LSHIFT] or pressed_keys[pygame.K_RSHIFT]
 
 def exit_event(event, pressed_keys):
     return (event.type == pygame.QUIT) or \
@@ -28,11 +37,12 @@ def fixed_mouse_pos(ds_center_fix):
 
 class App:
     def __init__(self, screen=None):
-        pygame.init()
         self.screen = screen
-        self.game = game.GameEngine(screen_size=WINDOW_SIZE, screen=self.screen)
+        self.game = game.GameEngine(screen_size=WINDOW_SIZE, screen=self.screen, 
+                                    mapsize=MAP_SIZE)
 
     def run(self):
+        player = self.game.player
         last_state = current_state = None
         show_fps = False; fpsfont = fontutils.get_sysfont("Monospace", 32); force_show_fps = False
         max_fps = MAX_FPS
@@ -50,15 +60,16 @@ class App:
                     if event.key == pygame.K_F3:
                         show_fps = not show_fps
                         if show_fps: force_show_fps = True
-                    elif event.key == pygame.K_f and (pressed_keys[pygame.K_LSHIFT] or pressed_keys[pygame.K_RSHIFT]):
+                    elif event.key == pygame.K_f and shift_pressed(pressed_keys):
                         max_fps = MAX_FPS if max_fps == 60 else 60
                         print("set max fps", max_fps)
                     elif event.key == pygame.K_k and isinstance(current_state, states.DungeonState):
-                        self.game.player.take_damage(0.5)
-                        print(self.game.player.health_points)
+                        player.take_damage(0.5)
                     elif event.key == pygame.K_l and isinstance(current_state, states.DungeonState):
-                        self.game.player.take_damage(-0.5)
-                        print(self.game.player.health_points)
+                        player.take_damage(-0.5)
+                    elif event.key == pygame.K_r and isinstance(current_state, states.DungeonState):
+                        player.reveal_all_map_tiles()
+                        player.minimap.update_on_new_level()
             last_state = current_state
             current_state = self.game.top_state
             if current_state is None: 
@@ -94,7 +105,6 @@ class App:
 
 
 if __name__ == "__main__":
-    screen = pygame.display.set_mode(WINDOW_SIZE)
     print("Screen size:", WINDOW_SIZE)
     profiler = cProfile.Profile()
     profiler.enable()

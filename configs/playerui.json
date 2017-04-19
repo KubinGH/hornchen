@@ -1,7 +1,13 @@
 {
     "infofont_size": 30,
+    "msg_pos": [10, 218],
+
     "minimap_pos": [768, 0],
     "minimap_size": [256, 256],
     "minimap_tiles": [8, 8],
-    "minimap_blocksize": 32
+    "minimap_blocksize": 32,
+
+    "heart_size": [40, 40],
+    "hearts_gap": 8,
+    "hearts_pos": [2, 2]
 }

@@ -1,5 +1,3 @@
-import math
-
 import pygame
 
 import fontutils
@@ -8,6 +6,8 @@ from leveltiles import TileFlags
 import json_ext as json
 from colors import Color
 from basesprite import BaseSprite
+import playerui
+from libraries import fovlib
 
 from libraries import spriteutils
 
@@ -26,6 +26,7 @@ class PlayerCharacter(BaseSprite):
     base_max_hearts = 3
     base_move_speed = 2
     sprint_move_speed = 6
+    base_vision_radius = 16
     def __init__(self, game, *, imgname="Base"):
         self.game = game
         self.current_level = None
@@ -37,25 +38,19 @@ class PlayerCharacter(BaseSprite):
         self.move_sprint = False
         self.going_through_door = False
 
+        self.fov_enabled = self.game.vars["enable_fov"]
+        if self.fov_enabled:
+            self.computed_fov_map = None
+            self.current_level_vision = None
+
         self.health_points = self.max_hearts # 1 healthpoint == 1 heart
 
         self.info_font = fontutils.get_font("fonts/BookAntiqua.ttf", config_ui["infofont_size"])
         self.near_passage_text = fontutils.get_text_render(self.info_font, "Press Space to go through the door", True, Color.White)
 
-        self.full_minimap_surface = pygame.Surface((level_size[0] * tile_size, level_size[1] * tile_size))
-        self.minimap_surface = pygame.Surface(config_ui["minimap_size"])
-        self.minimap_rect = self.minimap_surface.get_rect()
-        self.minimap_border = imglib.color_border(config_ui["minimap_size"], (0, 29, 109), 4)
-
-        self.heart_img = imglib.load_image_from_file("images/sl/Heart.png")
-        self.heart_img = imglib.scale(self.heart_img, config_ui["heart_size"])
-        self.halfheart_img = imglib.load_image_from_file("images/sl/HeartHalf.png")
-        self.halfheart_img = imglib.scale(self.halfheart_img, config_ui["heart_size"])
-        self.emptyheart_img = imglib.load_image_from_file("images/sl/HeartEmpty.png")
-        self.emptyheart_img = imglib.scale(self.emptyheart_img, config_ui["heart_size"])
-        self.last_max_hearts = self.max_hearts
-        self.heart_surface = self.new_heart_surface()
-        self.update_hearts()
+        self.minimap = playerui.MinimapWidget(self.game, self)
+        self.map_reveal = self.new_gamemap_map()
+        self.hearts = playerui.HeartsWidget(self.game, self)
 
     def handle_events(self, events, pressed_keys, mouse_pos):
         self.moving["left"]  = pressed_keys[pygame.K_LEFT]
@@ -71,28 +66,42 @@ class PlayerCharacter(BaseSprite):
     def update(self):
         self.handle_moving()
         self.near_passage = None
+        pcol, prow = self.closest_tile_index
+        inside_level = 0 <= pcol < self.current_level.width and 0 <= prow < self.current_level.height
         for col, row in self.get_tiles_next_to():
             tile = self.current_level.layout[row][col]
             if TileFlags.Passage in tile.flags:
                 self.near_passage = tile
                 break
         else:
-            col, row = self.closest_tile_index
-            tile = self.current_level.layout[row][col]
+            tile = self.current_level.layout[prow][pcol]
             if TileFlags.Passage in tile.flags:
                 self.near_passage = tile
         if self.near_passage is None: 
             self.going_through_door = False
+        if self.fov_enabled and inside_level and not self.computed_fov_map[prow][pcol]:
+            fovlib.calculate_fov(self.current_level.transparency_map, 
+                                 *self.closest_tile_index, self.vision_radius,
+                                 dest=self.current_level_vision)
+            self.computed_fov_map[prow][pcol] = True
 
     def draw(self, screen, pos_fix=(0, 0), *, dui=True):
+        if self.fov_enabled:
+        # Draw black squares in places the player didn't see yet
+            for row in self.current_level.layout:
+                for tile in row:
+                    if not self.current_level_vision[tile.row_idx][tile.col_idx]:
+                        rect = pygame.Rect(tile.rect.x + pos_fix[0], tile.rect.y + pos_fix[1], 
+                                           tile.rect.width, tile.rect.height)
+                        pygame.draw.rect(screen, Color.Black, rect)
         super().draw(screen, pos_fix)
         if dui: self.draw_ui(screen, pos_fix)
 
     def draw_ui(self, screen, pos_fix=(0, 0)):
         if self.near_passage is not None:
-            screen.blit(self.near_passage_text, (10, pos_fix[1] - 38))
-        screen.blit(self.minimap_surface, config_ui["minimap_pos"])
-        screen.blit(self.heart_surface, config_ui["hearts_pos"])
+            screen.blit(self.near_passage_text, config_ui["msg_pos"])
+        self.minimap.draw(screen)
+        self.hearts.draw(screen)
 
     @property
     def surface(self):
@@ -100,79 +109,49 @@ class PlayerCharacter(BaseSprite):
 
     # ===== Methods =====
 
+    def new_empty_level_map(self):
+        return [[False for _ in range(self.current_level.width)]
+                for _ in range(self.current_level.height)]
+
+    def new_gamemap_map(self):
+        return [[False for _ in range(self.game.vars["mapsize"][0])] 
+                for _ in range(self.game.vars["mapsize"][1])]
+
     def take_damage(self, value):
         self.health_points -= value
         if self.health_points > self.max_hearts:
             self.health_points = self.max_hearts
         
         if value != 0: 
-            self.update_hearts()
+            self.on_damage()
 
     # Updates
 
     def on_new_level(self):
-        self.update_full_minimap()
-        self.update_minimap()
+        if self.fov_enabled:
+            self.computed_fov_map = self.new_empty_level_map()
+            self.current_level_vision = self.new_empty_level_map()
+        self.reveal_nearby_map_tiles()
+        self.minimap.update_on_new_level()
+
+    def on_damage(self):
+        self.hearts.update_on_player_damage()
 
     # Minimap
 
-    def update_full_minimap(self):
-        mazepos = self.game.vars["player_mazepos"]
-        for row, irow in enumerate(self.game.vars["maze"]):
-            for col, bit in enumerate(irow):
-                x, y = col * minimap_tile, row * minimap_tile
-                rect = pygame.Rect(x, y, minimap_tile, minimap_tile)
-                if bit:
-                    color = Color.Black
-                else:
-                    if (col, row) == mazepos:
-                        color = Color.Yellow
-                    else:
-                        color = Color.White
-                pygame.draw.rect(self.full_minimap_surface, color, rect)
+    def reveal_nearby_map_tiles(self):
+        col, row = self.game.vars["player_mazepos"]
+        width, height = self.game.vars["mapsize"]
+        self.map_reveal[row][col] = True
+        for ncol, nrow in [(col+1, row), (col-1, row), (col, row+1), (col, row-1),
+                           (col+1, row+1), (col-1, row+1), (col+1, row-1), (col-1, row-1)]:
+            if 0 <= ncol < width and 0 <= nrow < height:
+                self.map_reveal[nrow][ncol] = True
 
-    def update_minimap(self):
-        mazepos = self.game.vars["player_mazepos"]
-        mtopleftidx = ((minimap_tiles[0] - 1)/2 - mazepos[0]), ((minimap_tiles[1] - 1)/2 - mazepos[1])
-        mtopleft = mtopleftidx[0] * minimap_tile, mtopleftidx[1] * minimap_tile
-        self.minimap_rect.topleft = mtopleft
-        self.minimap_surface.fill(Color.Black)
-        self.minimap_surface.blit(self.full_minimap_surface, self.minimap_rect)
-        self.minimap_surface.blit(self.minimap_border, (0, 0))
-
-    # Hearts
-
-    def get_hp_half_round(self):
-        check = self.health_points * 2
-        return int(check) / 2 if check % 1 else self.health_points
-
-    def new_heart_surface(self):
-        hearts = self.max_hearts
-        heart_size = self.heart_img.get_size()
-        width = heart_size[0] * hearts + config_ui["hearts_gap"] * (hearts - 1)
-        height = heart_size[1]
-        # Don't ask why.
-        width += 4; height += 4
-        return pygame.Surface((width, height))
-
-    def update_hearts(self):
-        if self.max_hearts != self.last_max_hearts:
-            self.last_max_hearts = self.max_hearts
-            self.heart_surface = self.new_heart_surface()
-        rhealth = self.get_hp_half_round()
-        heart_size, gap = config_ui["heart_size"], config_ui["hearts_gap"]
-        rect = pygame.Rect(config_ui["hearts_pos"], heart_size)
-        drawn = 0
-        self.heart_surface.fill(Color.Black)
-        for h in range(math.floor(rhealth)):
-            self.heart_surface.blit(self.heart_img, rect); drawn += 1
-            rect.x += heart_size[0] + gap
-        if rhealth % 1 == 0.5:
-            self.heart_surface.blit(self.halfheart_img, rect); drawn += 1
-            rect.x += heart_size[0] + gap
-        for h in range(self.max_hearts - drawn):
-            self.heart_surface.blit(self.emptyheart_img, rect); drawn += 1
-            rect.x += heart_size[0] + gap          
+    def reveal_all_map_tiles(self):
+        for row in self.map_reveal:
+            for i in range(len(row)):
+                row[i] = True
 
     # ===== Hero attributes =====
 
@@ -192,6 +171,6 @@ class PlayerCharacter(BaseSprite):
     def dying(self):
         return self.health_points < self.max_hearts
 
-if __name__ == "__main__":
-    pygame.init()
-    p = PlayerCharacter(object())
+    @property
+    def vision_radius(self):
+        return self.base_vision_radius

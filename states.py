@@ -13,8 +13,6 @@ from libraries import mazegen
 
 TOPLEFT = (0, 0)
 
-MAZESIZE = (10, 10)
-
 reverse_directions = {"left": "right", "right": "left", 
                       "up": "down", "down": "up"}
 directions_base = {"left": "left", "right": "right", 
@@ -170,7 +168,7 @@ class MainMenuState(AbstractGameState):
         screen.blit(self.border, TOPLEFT)
 
     def start_game(self):
-        gen = mazegen.MazeGenerator(*MAZESIZE)
+        gen = mazegen.MazeGenerator(*self.game.vars["mapsize"])
         gen.create2()
         self.game.vars["maze"] = gen.data
         self.game.vars["player_mazepos"] = gen.start_pos

@@ -22,10 +22,10 @@ def load_image_from_file(filename, hint=None):
         this = pygame.image.load(filename)
         try:
             this_copy = this.copy()
-            pixelarr = pygame.PixelArray(this)
+            pixelarr = pygame.PixelArray(this_copy)
             pixelarr.replace(Color.White, (0, 0, 1), weights=(0, 0, 0))
-            this = this.convert()
-            this.set_colorkey(Color.White)
+            this_copy = this_copy.convert()
+            this_copy.set_colorkey(Color.White)
         except:
             pass
         else:

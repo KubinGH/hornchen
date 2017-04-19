@@ -74,14 +74,24 @@ class BaseLevel(AbstractLevel, metaclass=abc.ABCMeta):
         super().__init__()
         self.background = imglib.repeated_image_texture(self.bg_tile, level_surface_size)
         self.current_render = pygame.Surface(level_surface_size)
-        self.force_render = True
+        self.force_full_update = True
+        self.force_render_update = True
+        self.transparency_map = self.create_transparency_map()
 
     def get_layout_copy(self):
         return leveltiles.parse_layout(self.raw_layout, self)
 
     @property
     def layout_size(self):
-        return (len(self.layout[0]), len(self.layout))
+        return (self.width, self.height)
+
+    @property
+    def width(self):
+        return len(self.layout[0])
+
+    @property
+    def height(self):
+        return len(self.layout)
 
     def create_cache(self):
         return {}
@@ -93,7 +103,25 @@ class BaseLevel(AbstractLevel, metaclass=abc.ABCMeta):
     def stop(self):
         return self.create_cache()
 
+    def create_transparency_map(self):
+        return [[tile.passable for tile in row] for row in self.layout]
+
+    def update_render(self):
+        self.current_render.fill(Color.Black)
+        self.current_render.blit(self.background, TOPLEFT)
+        for row in self.layout:
+            for tile in row:
+                self.current_render.blit(tile.surface, tile.rect)
+
+    def update_full(self):
+        self.create_transparency_map()
+        self.update_render()
+
     def update(self):
+        if self.force_full_update:
+            self.update_full()
+            self.force_full_update = False
+            self.force_render_update = False
         for row in self.layout:
             for tile in row:
                 if tile.needs_update:
@@ -105,19 +133,13 @@ class BaseLevel(AbstractLevel, metaclass=abc.ABCMeta):
         pass
 
     def draw(self, screen, fix=TOPLEFT):
-        if self.force_render:
+        if self.force_render_update:
             self.update_render()
-            self.force_render = False
+            self.force_render_update = False
         screen.blit(self.current_render, fix)
         for sprite in self.sprites:
             sprite.draw(screen, fix)
 
-    def update_render(self):
-        self.current_render.fill(Color.Black)
-        self.current_render.blit(self.background, TOPLEFT)
-        for row in self.layout:
-            for tile in row:
-                self.current_render.blit(tile.surface, tile.rect)
 
 
 

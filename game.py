@@ -3,9 +3,9 @@ from player import PlayerCharacter
 
 class GameEngine:
     default_vars = {"screen": None, "draw_surface": None, "screen_size": None,
-                    "level_caches": {}, "map": None}
+                    "level_caches": {}, "map": None, "enable_fov": False}
     def __init__(self, **kwargs):
-        self.vars = {}
+        self.vars = self.default_vars.copy()
         self.vars.update(kwargs)
         self.state_stack = []
         self.player = PlayerCharacter(self)
@@ -19,12 +19,15 @@ class GameEngine:
         pass
 
     def push_state(self, state):
+        print("Push state {} to the stack".format(type(state).__name__))
         self.state_stack.append(state)
 
     def push_state_t(self, state_type):
+        print("Push state (type) {} to the stack".format(state_type.__name__))
         self.state_stack.append(state_type(self))
 
     def pop_state(self, i=-1):
+        print("Pop state {} from the stack at index {}".format(type(self.state_stack[i]).__name__, i))
         return self.state_stack.pop(i)
 
     def handle_events(self, state, events, pressed_keys, mouse_pos, *args, **kwargs):

@@ -33,3 +33,22 @@ def get_text_render(font, text, antialias, color, background=None, dolog=True):
         if dolog: log("Text render: {}".format(params))
         render_cache[params] = font.render(text, antialias, color, background)
     return render_cache[params]
+
+multiline_render_cache = {}
+def get_multiline_text_render(font, text, antialias, color, background=None, linegap=2, dolog=False):
+    if isinstance(color, pygame.Color):
+        color = color_as_tuple(color)
+    params = (font, text, antialias, color, background, linegap)
+    if params not in multiline_render_cache:
+        lines_render = [get_text_render(font, line, antialias, color, background, dolog)
+                        for line in text.strip().split("\n")]
+        width = max(surface.get_width() for surface in lines_render)
+        height = sum(surface.get_height() for surface in lines_render) + \
+                    (linegap * (len(lines_render) - 1))
+        surface = pygame.Surface((width, height))
+        current_height = 0
+        for render in lines_render:
+            surface.blit(render, (0, current_height))
+            current_height += render.get_height() + linegap
+        multiline_render_cache[params] = surface
+    return multiline_render_cache[params]

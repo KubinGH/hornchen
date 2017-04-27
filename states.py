@@ -193,8 +193,8 @@ class PauseState(AbstractGameState):
         super().__init__(game)
 
         if parent_surface is None:
-            if "draw_surface" in game.vars:
-                self.parent_surface = self.game.vars["draw_surface"]
+            if "screen" in game.vars:
+                self.parent_surface = self.game.vars["screen"]
             else:
                 self.parent_surface = pygame.Surface(self.game.vars["screen_size"])
                 self.parent_surface.fill(Color.Black)

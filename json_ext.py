@@ -1,5 +1,7 @@
 from json import *
 
+print("Load JSON parser")
+
 _load = load
 json_cache = {}
 def load(file, arrays_to_tuples=True):

@@ -939,6 +939,7 @@ static const char __pyx_k_pair[] = "pair";
 static const char __pyx_k_rect[] = "rect";
 static const char __pyx_k_test[] = "__test__";
 static const char __pyx_k_clamp[] = "clamp";
+static const char __pyx_k_level[] = "level";
 static const char __pyx_k_right[] = "right";
 static const char __pyx_k_append[] = "append";
 static const char __pyx_k_bottom[] = "bottom";
@@ -955,14 +956,13 @@ static const char __pyx_k_move_speed[] = "move_speed";
 static const char __pyx_k_colliderect[] = "colliderect";
 static const char __pyx_k_layout_size[] = "layout_size";
 static const char __pyx_k_screen_rect[] = "screen_rect";
-static const char __pyx_k_current_level[] = "current_level";
 static const char __pyx_k_cyspriteutils[] = "cyspriteutils";
 static const char __pyx_k_next_to_cache[] = "next_to_cache";
 static const char __pyx_k_get_tiles_next_to[] = "get_tiles_next_to";
 static const char __pyx_k_closest_tile_index[] = "closest_tile_index";
 static const char __pyx_k_level_impassable_collision[] = "level_impassable_collision";
-static const char __pyx_k_C_Users_Admin_Desktop_Rogue_libr[] = "C:\\Users\\Admin\\Desktop\\Rogue\\libraries\\spriteutils\\cyspriteutils.pyx";
-static PyObject *__pyx_kp_s_C_Users_Admin_Desktop_Rogue_libr;
+static const char __pyx_k_C_Users_Admin_Desktop_Hornchen_l[] = "C:\\Users\\Admin\\Desktop\\Hornchen\\libraries\\spriteutils\\cyspriteutils.pyx";
+static PyObject *__pyx_kp_s_C_Users_Admin_Desktop_Hornchen_l;
 static PyObject *__pyx_n_s_append;
 static PyObject *__pyx_n_s_bot;
 static PyObject *__pyx_n_s_bottom;
@@ -970,7 +970,6 @@ static PyObject *__pyx_n_s_clamp;
 static PyObject *__pyx_n_s_closest_tile_index;
 static PyObject *__pyx_n_s_col;
 static PyObject *__pyx_n_s_colliderect;
-static PyObject *__pyx_n_s_current_level;
 static PyObject *__pyx_n_s_cyspriteutils;
 static PyObject *__pyx_n_u_down;
 static PyObject *__pyx_n_s_get_tiles_next_to;
@@ -980,6 +979,7 @@ static PyObject *__pyx_n_s_layout;
 static PyObject *__pyx_n_s_layout_size;
 static PyObject *__pyx_n_s_left;
 static PyObject *__pyx_n_u_left;
+static PyObject *__pyx_n_s_level;
 static PyObject *__pyx_n_s_level_cols;
 static PyObject *__pyx_n_s_level_impassable_collision;
 static PyObject *__pyx_n_s_level_rows;
@@ -1761,7 +1761,7 @@ static PyObject *__pyx_f_13cyspriteutils_move_in_level(PyObject *__pyx_v_layout,
  *         if lft_in and (imp_col(layout, next_rect, col - 1, row) or \
  *            (top_in and imp_col(layout, next_rect, col - 1, row - 1)) or \             # <<<<<<<<<<<<<<
  *            (bot_in and imp_col(layout, next_rect, col - 1, row + 1))):
- *           collided = True
+ *             collided = True
  */
     __pyx_t_4 = (__pyx_v_top_in != 0);
     if (!__pyx_t_4) {
@@ -1842,8 +1842,8 @@ static PyObject *__pyx_f_13cyspriteutils_move_in_level(PyObject *__pyx_v_layout,
  *         if lft_in and (imp_col(layout, next_rect, col - 1, row) or \
  *            (top_in and imp_col(layout, next_rect, col - 1, row - 1)) or \
  *            (bot_in and imp_col(layout, next_rect, col - 1, row + 1))):             # <<<<<<<<<<<<<<
- *           collided = True
- *           rect.left = layout[row][col - 1].rect.right
+ *             collided = True
+ *             rect.left = layout[row][col - 1].rect.right
  */
     __pyx_t_4 = (__pyx_v_bot_in != 0);
     if (__pyx_t_4) {
@@ -1929,16 +1929,16 @@ static PyObject *__pyx_f_13cyspriteutils_move_in_level(PyObject *__pyx_v_layout,
       /* "cyspriteutils.pyx":30
  *            (top_in and imp_col(layout, next_rect, col - 1, row - 1)) or \
  *            (bot_in and imp_col(layout, next_rect, col - 1, row + 1))):
- *           collided = True             # <<<<<<<<<<<<<<
- *           rect.left = layout[row][col - 1].rect.right
+ *             collided = True             # <<<<<<<<<<<<<<
+ *             rect.left = layout[row][col - 1].rect.right
  *         if not collided:
  */
       __pyx_v_collided = 1;
 
       /* "cyspriteutils.pyx":31
  *            (bot_in and imp_col(layout, next_rect, col - 1, row + 1))):
- *           collided = True
- *           rect.left = layout[row][col - 1].rect.right             # <<<<<<<<<<<<<<
+ *             collided = True
+ *             rect.left = layout[row][col - 1].rect.right             # <<<<<<<<<<<<<<
  *         if not collided:
  *             rect = next_rect
  */
@@ -1971,8 +1971,8 @@ static PyObject *__pyx_f_13cyspriteutils_move_in_level(PyObject *__pyx_v_layout,
     }
 
     /* "cyspriteutils.pyx":32
- *           collided = True
- *           rect.left = layout[row][col - 1].rect.right
+ *             collided = True
+ *             rect.left = layout[row][col - 1].rect.right
  *         if not collided:             # <<<<<<<<<<<<<<
  *             rect = next_rect
  * 
@@ -1981,7 +1981,7 @@ static PyObject *__pyx_f_13cyspriteutils_move_in_level(PyObject *__pyx_v_layout,
     if (__pyx_t_3) {
 
       /* "cyspriteutils.pyx":33
- *           rect.left = layout[row][col - 1].rect.right
+ *             rect.left = layout[row][col - 1].rect.right
  *         if not collided:
  *             rect = next_rect             # <<<<<<<<<<<<<<
  * 
@@ -1991,8 +1991,8 @@ static PyObject *__pyx_f_13cyspriteutils_move_in_level(PyObject *__pyx_v_layout,
       __Pyx_DECREF_SET(__pyx_v_rect, __pyx_v_next_rect);
 
       /* "cyspriteutils.pyx":32
- *           collided = True
- *           rect.left = layout[row][col - 1].rect.right
+ *             collided = True
+ *             rect.left = layout[row][col - 1].rect.right
  *         if not collided:             # <<<<<<<<<<<<<<
  *             rect = next_rect
  * 
@@ -2133,7 +2133,7 @@ static PyObject *__pyx_f_13cyspriteutils_move_in_level(PyObject *__pyx_v_layout,
  *         if rgt_in and (imp_col(layout, next_rect, col + 1, row) or \
  *            (top_in and imp_col(layout, next_rect, col + 1, row - 1)) or \             # <<<<<<<<<<<<<<
  *            (bot_in and imp_col(layout, next_rect, col + 1, row + 1))):
- *           collided = True
+ *             collided = True
  */
     __pyx_t_4 = (__pyx_v_top_in != 0);
     if (!__pyx_t_4) {
@@ -2214,8 +2214,8 @@ static PyObject *__pyx_f_13cyspriteutils_move_in_level(PyObject *__pyx_v_layout,
  *         if rgt_in and (imp_col(layout, next_rect, col + 1, row) or \
  *            (top_in and imp_col(layout, next_rect, col + 1, row - 1)) or \
  *            (bot_in and imp_col(layout, next_rect, col + 1, row + 1))):             # <<<<<<<<<<<<<<
- *           collided = True
- *           rect.right = layout[row][col + 1].rect.left
+ *             collided = True
+ *             rect.right = layout[row][col + 1].rect.left
  */
     __pyx_t_4 = (__pyx_v_bot_in != 0);
     if (__pyx_t_4) {
@@ -2301,16 +2301,16 @@ static PyObject *__pyx_f_13cyspriteutils_move_in_level(PyObject *__pyx_v_layout,
       /* "cyspriteutils.pyx":41
  *            (top_in and imp_col(layout, next_rect, col + 1, row - 1)) or \
  *            (bot_in and imp_col(layout, next_rect, col + 1, row + 1))):
- *           collided = True             # <<<<<<<<<<<<<<
- *           rect.right = layout[row][col + 1].rect.left
+ *             collided = True             # <<<<<<<<<<<<<<
+ *             rect.right = layout[row][col + 1].rect.left
  *         if not collided:
  */
       __pyx_v_collided = 1;
 
       /* "cyspriteutils.pyx":42
  *            (bot_in and imp_col(layout, next_rect, col + 1, row + 1))):
- *           collided = True
- *           rect.right = layout[row][col + 1].rect.left             # <<<<<<<<<<<<<<
+ *             collided = True
+ *             rect.right = layout[row][col + 1].rect.left             # <<<<<<<<<<<<<<
  *         if not collided:
  *             rect = next_rect
  */
@@ -2343,8 +2343,8 @@ static PyObject *__pyx_f_13cyspriteutils_move_in_level(PyObject *__pyx_v_layout,
     }
 
     /* "cyspriteutils.pyx":43
- *           collided = True
- *           rect.right = layout[row][col + 1].rect.left
+ *             collided = True
+ *             rect.right = layout[row][col + 1].rect.left
  *         if not collided:             # <<<<<<<<<<<<<<
  *             rect = next_rect
  * 
@@ -2353,7 +2353,7 @@ static PyObject *__pyx_f_13cyspriteutils_move_in_level(PyObject *__pyx_v_layout,
     if (__pyx_t_3) {
 
       /* "cyspriteutils.pyx":44
- *           rect.right = layout[row][col + 1].rect.left
+ *             rect.right = layout[row][col + 1].rect.left
  *         if not collided:
  *             rect = next_rect             # <<<<<<<<<<<<<<
  * 
@@ -2363,8 +2363,8 @@ static PyObject *__pyx_f_13cyspriteutils_move_in_level(PyObject *__pyx_v_layout,
       __Pyx_DECREF_SET(__pyx_v_rect, __pyx_v_next_rect);
 
       /* "cyspriteutils.pyx":43
- *           collided = True
- *           rect.right = layout[row][col + 1].rect.left
+ *             collided = True
+ *             rect.right = layout[row][col + 1].rect.left
  *         if not collided:             # <<<<<<<<<<<<<<
  *             rect = next_rect
  * 
@@ -2505,7 +2505,7 @@ static PyObject *__pyx_f_13cyspriteutils_move_in_level(PyObject *__pyx_v_layout,
  *         if top_in and (imp_col(layout, next_rect, col, row - 1) or \
  *            (lft_in and imp_col(layout, next_rect, col - 1, row - 1)) or \             # <<<<<<<<<<<<<<
  *            (rgt_in and imp_col(layout, next_rect, col + 1, row - 1))):
- *           collided = True
+ *             collided = True
  */
     __pyx_t_4 = (__pyx_v_lft_in != 0);
     if (!__pyx_t_4) {
@@ -2586,8 +2586,8 @@ static PyObject *__pyx_f_13cyspriteutils_move_in_level(PyObject *__pyx_v_layout,
  *         if top_in and (imp_col(layout, next_rect, col, row - 1) or \
  *            (lft_in and imp_col(layout, next_rect, col - 1, row - 1)) or \
  *            (rgt_in and imp_col(layout, next_rect, col + 1, row - 1))):             # <<<<<<<<<<<<<<
- *           collided = True
- *           rect.top = layout[row - 1][col].rect.bottom
+ *             collided = True
+ *             rect.top = layout[row - 1][col].rect.bottom
  */
     __pyx_t_4 = (__pyx_v_rgt_in != 0);
     if (__pyx_t_4) {
@@ -2673,16 +2673,16 @@ static PyObject *__pyx_f_13cyspriteutils_move_in_level(PyObject *__pyx_v_layout,
       /* "cyspriteutils.pyx":52
  *            (lft_in and imp_col(layout, next_rect, col - 1, row - 1)) or \
  *            (rgt_in and imp_col(layout, next_rect, col + 1, row - 1))):
- *           collided = True             # <<<<<<<<<<<<<<
- *           rect.top = layout[row - 1][col].rect.bottom
+ *             collided = True             # <<<<<<<<<<<<<<
+ *             rect.top = layout[row - 1][col].rect.bottom
  *         if not collided:
  */
       __pyx_v_collided = 1;
 
       /* "cyspriteutils.pyx":53
  *            (rgt_in and imp_col(layout, next_rect, col + 1, row - 1))):
- *           collided = True
- *           rect.top = layout[row - 1][col].rect.bottom             # <<<<<<<<<<<<<<
+ *             collided = True
+ *             rect.top = layout[row - 1][col].rect.bottom             # <<<<<<<<<<<<<<
  *         if not collided:
  *             rect = next_rect
  */
@@ -2715,8 +2715,8 @@ static PyObject *__pyx_f_13cyspriteutils_move_in_level(PyObject *__pyx_v_layout,
     }
 
     /* "cyspriteutils.pyx":54
- *           collided = True
- *           rect.top = layout[row - 1][col].rect.bottom
+ *             collided = True
+ *             rect.top = layout[row - 1][col].rect.bottom
  *         if not collided:             # <<<<<<<<<<<<<<
  *             rect = next_rect
  * 
@@ -2725,7 +2725,7 @@ static PyObject *__pyx_f_13cyspriteutils_move_in_level(PyObject *__pyx_v_layout,
     if (__pyx_t_3) {
 
       /* "cyspriteutils.pyx":55
- *           rect.top = layout[row - 1][col].rect.bottom
+ *             rect.top = layout[row - 1][col].rect.bottom
  *         if not collided:
  *             rect = next_rect             # <<<<<<<<<<<<<<
  * 
@@ -2735,8 +2735,8 @@ static PyObject *__pyx_f_13cyspriteutils_move_in_level(PyObject *__pyx_v_layout,
       __Pyx_DECREF_SET(__pyx_v_rect, __pyx_v_next_rect);
 
       /* "cyspriteutils.pyx":54
- *           collided = True
- *           rect.top = layout[row - 1][col].rect.bottom
+ *             collided = True
+ *             rect.top = layout[row - 1][col].rect.bottom
  *         if not collided:             # <<<<<<<<<<<<<<
  *             rect = next_rect
  * 
@@ -2877,7 +2877,7 @@ static PyObject *__pyx_f_13cyspriteutils_move_in_level(PyObject *__pyx_v_layout,
  *         if bot_in and (imp_col(layout, next_rect, col, row + 1) or \
  *            (lft_in and imp_col(layout, next_rect, col - 1, row + 1)) or \             # <<<<<<<<<<<<<<
  *            (rgt_in and imp_col(layout, next_rect, col + 1, row + 1))):
- *           collided = True
+ *             collided = True
  */
     __pyx_t_4 = (__pyx_v_lft_in != 0);
     if (!__pyx_t_4) {
@@ -2958,8 +2958,8 @@ static PyObject *__pyx_f_13cyspriteutils_move_in_level(PyObject *__pyx_v_layout,
  *         if bot_in and (imp_col(layout, next_rect, col, row + 1) or \
  *            (lft_in and imp_col(layout, next_rect, col - 1, row + 1)) or \
  *            (rgt_in and imp_col(layout, next_rect, col + 1, row + 1))):             # <<<<<<<<<<<<<<
- *           collided = True
- *           rect.bottom = layout[row + 1][col].rect.top
+ *             collided = True
+ *             rect.bottom = layout[row + 1][col].rect.top
  */
     __pyx_t_4 = (__pyx_v_rgt_in != 0);
     if (__pyx_t_4) {
@@ -3045,16 +3045,16 @@ static PyObject *__pyx_f_13cyspriteutils_move_in_level(PyObject *__pyx_v_layout,
       /* "cyspriteutils.pyx":63
  *            (lft_in and imp_col(layout, next_rect, col - 1, row + 1)) or \
  *            (rgt_in and imp_col(layout, next_rect, col + 1, row + 1))):
- *           collided = True             # <<<<<<<<<<<<<<
- *           rect.bottom = layout[row + 1][col].rect.top
+ *             collided = True             # <<<<<<<<<<<<<<
+ *             rect.bottom = layout[row + 1][col].rect.top
  *         if not collided:
  */
       __pyx_v_collided = 1;
 
       /* "cyspriteutils.pyx":64
  *            (rgt_in and imp_col(layout, next_rect, col + 1, row + 1))):
- *           collided = True
- *           rect.bottom = layout[row + 1][col].rect.top             # <<<<<<<<<<<<<<
+ *             collided = True
+ *             rect.bottom = layout[row + 1][col].rect.top             # <<<<<<<<<<<<<<
  *         if not collided:
  *             rect = next_rect
  */
@@ -3087,8 +3087,8 @@ static PyObject *__pyx_f_13cyspriteutils_move_in_level(PyObject *__pyx_v_layout,
     }
 
     /* "cyspriteutils.pyx":65
- *           collided = True
- *           rect.bottom = layout[row + 1][col].rect.top
+ *             collided = True
+ *             rect.bottom = layout[row + 1][col].rect.top
  *         if not collided:             # <<<<<<<<<<<<<<
  *             rect = next_rect
  * 
@@ -3097,7 +3097,7 @@ static PyObject *__pyx_f_13cyspriteutils_move_in_level(PyObject *__pyx_v_layout,
     if (__pyx_t_3) {
 
       /* "cyspriteutils.pyx":66
- *           rect.bottom = layout[row + 1][col].rect.top
+ *             rect.bottom = layout[row + 1][col].rect.top
  *         if not collided:
  *             rect = next_rect             # <<<<<<<<<<<<<<
  * 
@@ -3107,8 +3107,8 @@ static PyObject *__pyx_f_13cyspriteutils_move_in_level(PyObject *__pyx_v_layout,
       __Pyx_DECREF_SET(__pyx_v_rect, __pyx_v_next_rect);
 
       /* "cyspriteutils.pyx":65
- *           collided = True
- *           rect.bottom = layout[row + 1][col].rect.top
+ *             collided = True
+ *             rect.bottom = layout[row + 1][col].rect.top
  *         if not collided:             # <<<<<<<<<<<<<<
  *             rect = next_rect
  * 
@@ -3428,7 +3428,7 @@ static PyObject *__pyx_pf_13cyspriteutils_6get_tiles_next_to(CYTHON_UNUSED PyObj
  *         bint lft, rgt, top, bot
  *     if pair not in sprite.next_to_cache:             # <<<<<<<<<<<<<<
  *         sprite.next_to_cache[pair] = []
- *         level_cols, level_rows = sprite.current_level.layout_size
+ *         level_cols, level_rows = sprite.level.layout_size
  */
   __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_v_sprite, __pyx_n_s_next_to_cache); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 80, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
@@ -3441,7 +3441,7 @@ static PyObject *__pyx_pf_13cyspriteutils_6get_tiles_next_to(CYTHON_UNUSED PyObj
  *         bint lft, rgt, top, bot
  *     if pair not in sprite.next_to_cache:
  *         sprite.next_to_cache[pair] = []             # <<<<<<<<<<<<<<
- *         level_cols, level_rows = sprite.current_level.layout_size
+ *         level_cols, level_rows = sprite.level.layout_size
  *         lft = rgt = top = bot = False
  */
     __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 81, __pyx_L1_error)
@@ -3455,11 +3455,11 @@ static PyObject *__pyx_pf_13cyspriteutils_6get_tiles_next_to(CYTHON_UNUSED PyObj
     /* "cyspriteutils.pyx":82
  *     if pair not in sprite.next_to_cache:
  *         sprite.next_to_cache[pair] = []
- *         level_cols, level_rows = sprite.current_level.layout_size             # <<<<<<<<<<<<<<
+ *         level_cols, level_rows = sprite.level.layout_size             # <<<<<<<<<<<<<<
  *         lft = rgt = top = bot = False
  *         if col > 0:
  */
-    __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_v_sprite, __pyx_n_s_current_level); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 82, __pyx_L1_error)
+    __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_v_sprite, __pyx_n_s_level); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 82, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
     __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_layout_size); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 82, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_5);
@@ -3523,7 +3523,7 @@ static PyObject *__pyx_pf_13cyspriteutils_6get_tiles_next_to(CYTHON_UNUSED PyObj
 
     /* "cyspriteutils.pyx":83
  *         sprite.next_to_cache[pair] = []
- *         level_cols, level_rows = sprite.current_level.layout_size
+ *         level_cols, level_rows = sprite.level.layout_size
  *         lft = rgt = top = bot = False             # <<<<<<<<<<<<<<
  *         if col > 0:
  *             lft = True; sprite.next_to_cache[pair].append((col - 1, row))
@@ -3534,7 +3534,7 @@ static PyObject *__pyx_pf_13cyspriteutils_6get_tiles_next_to(CYTHON_UNUSED PyObj
     __pyx_v_bot = 0;
 
     /* "cyspriteutils.pyx":84
- *         level_cols, level_rows = sprite.current_level.layout_size
+ *         level_cols, level_rows = sprite.level.layout_size
  *         lft = rgt = top = bot = False
  *         if col > 0:             # <<<<<<<<<<<<<<
  *             lft = True; sprite.next_to_cache[pair].append((col - 1, row))
@@ -3573,7 +3573,7 @@ static PyObject *__pyx_pf_13cyspriteutils_6get_tiles_next_to(CYTHON_UNUSED PyObj
       __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
 
       /* "cyspriteutils.pyx":84
- *         level_cols, level_rows = sprite.current_level.layout_size
+ *         level_cols, level_rows = sprite.level.layout_size
  *         lft = rgt = top = bot = False
  *         if col > 0:             # <<<<<<<<<<<<<<
  *             lft = True; sprite.next_to_cache[pair].append((col - 1, row))
@@ -3949,7 +3949,7 @@ static PyObject *__pyx_pf_13cyspriteutils_6get_tiles_next_to(CYTHON_UNUSED PyObj
  *         bint lft, rgt, top, bot
  *     if pair not in sprite.next_to_cache:             # <<<<<<<<<<<<<<
  *         sprite.next_to_cache[pair] = []
- *         level_cols, level_rows = sprite.current_level.layout_size
+ *         level_cols, level_rows = sprite.level.layout_size
  */
   }
 
@@ -4017,7 +4017,7 @@ static struct PyModuleDef __pyx_moduledef = {
 #endif
 
 static __Pyx_StringTabEntry __pyx_string_tab[] = {
-  {&__pyx_kp_s_C_Users_Admin_Desktop_Rogue_libr, __pyx_k_C_Users_Admin_Desktop_Rogue_libr, sizeof(__pyx_k_C_Users_Admin_Desktop_Rogue_libr), 0, 0, 1, 0},
+  {&__pyx_kp_s_C_Users_Admin_Desktop_Hornchen_l, __pyx_k_C_Users_Admin_Desktop_Hornchen_l, sizeof(__pyx_k_C_Users_Admin_Desktop_Hornchen_l), 0, 0, 1, 0},
   {&__pyx_n_s_append, __pyx_k_append, sizeof(__pyx_k_append), 0, 0, 1, 1},
   {&__pyx_n_s_bot, __pyx_k_bot, sizeof(__pyx_k_bot), 0, 0, 1, 1},
   {&__pyx_n_s_bottom, __pyx_k_bottom, sizeof(__pyx_k_bottom), 0, 0, 1, 1},
@@ -4025,7 +4025,6 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_closest_tile_index, __pyx_k_closest_tile_index, sizeof(__pyx_k_closest_tile_index), 0, 0, 1, 1},
   {&__pyx_n_s_col, __pyx_k_col, sizeof(__pyx_k_col), 0, 0, 1, 1},
   {&__pyx_n_s_colliderect, __pyx_k_colliderect, sizeof(__pyx_k_colliderect), 0, 0, 1, 1},
-  {&__pyx_n_s_current_level, __pyx_k_current_level, sizeof(__pyx_k_current_level), 0, 0, 1, 1},
   {&__pyx_n_s_cyspriteutils, __pyx_k_cyspriteutils, sizeof(__pyx_k_cyspriteutils), 0, 0, 1, 1},
   {&__pyx_n_u_down, __pyx_k_down, sizeof(__pyx_k_down), 0, 1, 0, 1},
   {&__pyx_n_s_get_tiles_next_to, __pyx_k_get_tiles_next_to, sizeof(__pyx_k_get_tiles_next_to), 0, 0, 1, 1},
@@ -4035,6 +4034,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_layout_size, __pyx_k_layout_size, sizeof(__pyx_k_layout_size), 0, 0, 1, 1},
   {&__pyx_n_s_left, __pyx_k_left, sizeof(__pyx_k_left), 0, 0, 1, 1},
   {&__pyx_n_u_left, __pyx_k_left, sizeof(__pyx_k_left), 0, 1, 0, 1},
+  {&__pyx_n_s_level, __pyx_k_level, sizeof(__pyx_k_level), 0, 0, 1, 1},
   {&__pyx_n_s_level_cols, __pyx_k_level_cols, sizeof(__pyx_k_level_cols), 0, 0, 1, 1},
   {&__pyx_n_s_level_impassable_collision, __pyx_k_level_impassable_collision, sizeof(__pyx_k_level_impassable_collision), 0, 0, 1, 1},
   {&__pyx_n_s_level_rows, __pyx_k_level_rows, sizeof(__pyx_k_level_rows), 0, 0, 1, 1},
@@ -4079,7 +4079,7 @@ static int __Pyx_InitCachedConstants(void) {
   __pyx_tuple_ = PyTuple_Pack(10, __pyx_n_s_sprite, __pyx_n_s_pair, __pyx_n_s_col, __pyx_n_s_row, __pyx_n_s_level_cols, __pyx_n_s_level_rows, __pyx_n_s_lft, __pyx_n_s_rgt, __pyx_n_s_top, __pyx_n_s_bot); if (unlikely(!__pyx_tuple_)) __PYX_ERR(0, 73, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple_);
   __Pyx_GIVEREF(__pyx_tuple_);
-  __pyx_codeobj__2 = (PyObject*)__Pyx_PyCode_New(1, 0, 10, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple_, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_C_Users_Admin_Desktop_Rogue_libr, __pyx_n_s_get_tiles_next_to, 73, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__2)) __PYX_ERR(0, 73, __pyx_L1_error)
+  __pyx_codeobj__2 = (PyObject*)__Pyx_PyCode_New(1, 0, 10, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple_, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_C_Users_Admin_Desktop_Hornchen_l, __pyx_n_s_get_tiles_next_to, 73, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__2)) __PYX_ERR(0, 73, __pyx_L1_error)
   __Pyx_RefNannyFinishContext();
   return 0;
   __pyx_L1_error:;

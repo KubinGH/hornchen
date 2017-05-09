@@ -1,8 +1,9 @@
 import random
-import json_ext as json
+import warnings
 
 import pygame
 
+import json_ext as json
 import fontutils
 import imglib
 from abc_state import AbstractGameState
@@ -10,6 +11,8 @@ import levels
 from colors import Color
 import mapgen
 from libraries import mazegen
+
+print("Load states")
 
 TOPLEFT = (0, 0)
 
@@ -98,15 +101,15 @@ class TestState(AbstractGameState):
 # ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 
 class MainMenuState(AbstractGameState):
+    lazy_state = True
     config = json.load(open("configs/mainmenu.json", "r"))
     def __init__(self, game):
         super().__init__(game)
 
         self.logo_sword = imglib.load_image_from_file("images/tr/LogoSword.png")
-        self.bg_tile = imglib.load_image_from_file("images/dd/env/Bricks.png")
-        self.bg_tile = imglib.scale2x(self.bg_tile)
+        self.bg_tile = imglib.load_image_from_file("images/dd/env/Bricks.png", after_scale=(40, 40))
         self.background = imglib.repeated_image_texture(self.bg_tile, self.game.vars["screen_size"])
-        self.border = imglib.color_border(self.game.vars["screen_size"], (0, 29, 109), 3)
+        self.border_drawer = imglib.ColorBorderDrawer(self.game.vars["screen_size"], (0, 29, 109), 3)
         
         self.font = fontutils.get_font("fonts/OldLondon.ttf", self.config["fonts"]["sizes"]["font"])
         self.font_large = fontutils.get_font("fonts/OldLondon.ttf", self.config["fonts"]["sizes"]["font_large"])
@@ -165,7 +168,7 @@ class MainMenuState(AbstractGameState):
             used = self.buttons[key][self.mouse_hovering_over[key]]
             screen.blit(used, pos)
 
-        screen.blit(self.border, TOPLEFT)
+        self.border_drawer.draw(screen, TOPLEFT)
 
     def start_game(self):
         gen = mazegen.MazeGenerator(*self.game.vars["mapsize"])
@@ -185,6 +188,7 @@ class MainMenuState(AbstractGameState):
 # keyword argument.
 
 class PauseState(AbstractGameState):
+    lazy_state = True
     config = json.load(open("configs/pause.json", "r"))   
     pause_window_size = config["sizes"]["pause_window"]
     pause_window_pos = config["positions"]["pause_window"]
@@ -207,8 +211,8 @@ class PauseState(AbstractGameState):
         self.back_dimmer.set_alpha(125)
         self.parent_surface.blit(self.back_dimmer, TOPLEFT)
 
-        self.bg_tile = imglib.load_image_from_file("images/dd/env/BricksSmall.png")
-        self.border_tile = imglib.load_image_from_file("images/dd/env/WallDim.png")
+        self.bg_tile = imglib.load_image_from_file("images/dd/env/BricksSmall.png", after_scale=(20, 20))
+        self.border_tile = imglib.load_image_from_file("images/dd/env/WallDim.png", after_scale=(20, 20))
         self.pause_background = imglib.repeated_image_texture(self.bg_tile, self.pause_window_size)
         self.parent_surface.blit(self.pause_background, self.pause_window_pos)
         self.pause_background_border = imglib.image_border(self.pause_window_size, self.border_tile)
@@ -268,6 +272,8 @@ class PauseState(AbstractGameState):
             while not isinstance(self.game.top_state, MainMenuState):
                 nxt = self.game.pop_state()
                 nxt.cleanup()
+            print("Cache cleared by PauseState")
+            self.game.vars["level_caches"] = {}
             return
 
         if self.leaving:    
@@ -301,15 +307,26 @@ class DungeonState(AbstractGameState):
         self.level = level
         self.level.parent = self
 
-        self.border = imglib.color_border(self.game.vars["screen_size"], (0, 29, 109), 3)
+        self.border_drawer = imglib.ColorBorderDrawer(self.game.vars["screen_size"], 
+                                                      self.config["border_color"], 
+                                                      self.config["border_thickness"])
 
         self.player = player
-        self.player.current_level = self.level
-        assert self.level.start_entries[entry_dir] is not None, "Unspecified entry point from direction {}".format(entry_dir)
-        self.player.rect.x = self.level.start_entries[entry_dir][0] * self.tile_size
-        self.player.rect.y = self.level.start_entries[entry_dir][1] * self.tile_size
+        self.player.level = self.level
+        if self.level.start_entries[entry_dir] is not None:
+            entry_dir_pos = self.level.start_entries[entry_dir]
+        else:
+            if self.level.start_entries["any"] is not None:
+                entry_dir_pos = self.level.start_entries["any"]
+            else:
+                warnings.warn("DungeonState: Unspecified entry point from " + \
+                              "direction {} at level from {}".format(entry_dir, self.level.source))
+                entry_dir_pos = (0, 0)
+
+        self.player.rect.center = self.level.layout[entry_dir_pos[1]][entry_dir_pos[0]].rect.center
 
         self.player.on_new_level()
+        self.level.update()
 
     def cleanup(self):
         super().cleanup()
@@ -344,44 +361,68 @@ class DungeonState(AbstractGameState):
         elif not dplayer and dui:
             self.player.draw_ui(screen, self.pos_fix)
 
-        if dborder:     
-            screen.blit(self.border, TOPLEFT)
+        if dborder:
+            self.border_drawer.draw(screen, TOPLEFT)
 
 
     def handle_level_travel(self):
-        passage = self.player.near_passage
-        direction = self.level.start_entries_rev[passage.index]
-        mx, my = self.game.vars["player_mazepos"]
-        if direction == "left":     mx -= 1
-        elif direction == "right":  mx += 1
-        elif direction == "top":    my -= 1
-        elif direction == "bottom": my += 1
-        newlevel = self.game.vars["map"][my][mx]
-        print(self.game.vars["player_mazepos"], "-->", (mx, my), "dir:", direction)
-        self.game.vars["player_mazepos"] = (mx, my)
+        # Through which door is the player going
+        passage = self.player.near_passage 
+        # Direction of player movement on the map
+        direction = self.level.start_entries_rev[passage.index] 
+        # Compute the next position
+        next_x, next_y = last_x, last_y = self.game.vars["player_mazepos"]
+        if direction == "left":     next_x -= 1
+        elif direction == "right":  next_x += 1
+        elif direction == "top":    next_y -= 1
+        elif direction == "bottom": next_y += 1
+        print((last_x, last_y), "-->", (next_x, next_y), "dir:", direction)
         opposite_dir = levels.opposite_dirs[direction]
+        self.handle_next_level(last_x, last_y, next_x, next_y, direction, opposite_dir, True)
 
+    def handle_next_level(self, last_x, last_y, next_x, next_y, door_dir, entry_dir, use_interlude=True):
+        last_x = self.game.vars["player_mazepos"][0] if last_x is None else last_x
+        last_y = self.game.vars["player_mazepos"][1] if last_y is None else last_y
+        self.game.vars["level_caches"][(last_x, last_y)] = self.level.create_cache()
         self.game.pop_state()
         self.cleanup()
-        new_state = DungeonState(self.game, level=newlevel(), entry_dir=opposite_dir, 
+        newlevel = self.game.vars["map"][next_y][next_x]
+        self.game.vars["player_mazepos"] = (next_x, next_y)
+        if newlevel is None:
+            newlevel = levels.EmptyLevel
+        if (next_x, next_y) in self.game.vars["level_caches"]:
+            newlevelobj = newlevel.load_from_cache(self.game.vars["level_caches"][(next_x, next_y)])
+        else:
+            newlevelobj = newlevel()
+        new_state = DungeonState(self.game, level=newlevelobj, entry_dir=entry_dir, 
                                  player=self.player, run_interlude=True)
-        ssize = self.game.vars["screen"].get_size()
-        levelcrop = pygame.Rect(self.config["level_surface_position"], self.config["level_surface_size"])
-        topbarcrop = pygame.Rect(self.config["topbar_position"], self.config["topbar_size"])
-        surface1 = pygame.Surface(ssize)
-        self.draw(surface1, dplayer=False, dborder=False)
-        surface1 = surface1.subsurface(levelcrop)
-        surface2 = pygame.Surface(ssize)
-        new_state.draw(surface2, dplayer=False, dui=True, dborder=False)
-        topbar = surface2.subsurface(topbarcrop)
-        surface2 = surface2.subsurface(levelcrop)
+        if use_interlude:
+            # Draw a frame of the game in each state (those are on different levels),
+            # then save some of the UI elements (border, topbar) - static_elems,
+            # and then create and InterludeState.
+            ssize = self.game.vars["screen"].get_size()
+            # Crops used
+            levelcrop = pygame.Rect(self.config["level_surface_position"], self.config["level_surface_size"])
+            topbarcrop = pygame.Rect(self.config["topbar_position"], self.config["topbar_size"])
+            # Current (before)
+            surface1 = pygame.Surface(ssize)
+            self.draw(surface1, dplayer=False, dborder=False)
+            surface1 = surface1.subsurface(levelcrop)
+            # Next (after)
+            surface2 = pygame.Surface(ssize)
+            new_state.draw(surface2, dplayer=False, dui=True, dborder=False)
+            topbar = surface2.subsurface(topbarcrop) # The updated topbar, e.g. minimap
+            surface2 = surface2.subsurface(levelcrop)
 
-        interlude_way = reverse_directions[directions_base[direction]]
-        static_elems = [(self.config["topbar_position"], topbar)]
-        interlude = InterludeState(self.game, first=surface1, second=surface2, way=interlude_way, 
-                                   static_elems=static_elems, fix=self.config["level_surface_position"])
+            interlude_way = reverse_directions[directions_base[door_dir]]
+            static_elems = [(self.config["topbar_position"], topbar)]
+            drawers = [(self.border_drawer, TOPLEFT)]
+            interlude = InterludeState(self.game, first=surface1, second=surface2, way=interlude_way, 
+                                       static_elems=static_elems, drawers=drawers, fix=self.config["level_surface_position"])
+
         self.game.push_state(new_state)
-        self.game.push_state(interlude)
+        if use_interlude:
+            self.game.push_state(interlude)
 
 # ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 # ===== ===== =====     Interlude State     ===== ===== =====
@@ -391,17 +432,19 @@ class DungeonState(AbstractGameState):
 # 'second' and 'way' keyword arguments. 
 # The 'way' argument is a string: either 
 # "left", "right", "up" or "down".
-# The 'speed' keyword argument is optional, default 4. 
 
 class InterludeState(AbstractGameState):
-    def __init__(self, game, *, first, second, way, speed=3, static_elems=[], fix=(0, 0)):
+    def __init__(self, game, *, first, second, way, speed=3, static_elems=[], drawers=[], fix=(0, 0)):
         super().__init__(game)
 
         self.first, self.second = first, second
         self.way, self.speed = way, speed
         self.static_elems = static_elems
+        self.drawers = drawers
         self.fix = fix
 
+        # Here the program merges the two surfaces and then
+        # handles the way it will scroll.
         assert self.way in ("left", "right", "up", "down")
         first_w, first_h = self.first.get_size()
         second_w, second_h = self.second.get_size()
@@ -477,20 +520,8 @@ class InterludeState(AbstractGameState):
             screen.blit(self.surface, (self.rect.x + self.fix[0], self.rect.y + self.fix[1]))
         for pos, surface in self.static_elems:
             screen.blit(surface, pos)
+        for drawer, pos in self.drawers:
+            drawer.draw(screen, pos)
 
 
 # ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
-
-
-class _FakeGame:
-    vars = {"screen_size": (1024, 768)}
-_fake_game_inst = _FakeGame()
-_fake_surface_inst = pygame.Surface((1024, 768))
-
-if __name__ == "__main__":
-    pygame.init()
-    s1 = TestState(_fake_game_inst)
-    s2 = MainMenuState(_fake_game_inst)
-    s3 = PauseState(_fake_game_inst, parent_surface=_fake_surface_inst)
-    #s4 = DungeonState(_fake_game_inst, level=levels.start_level)
-

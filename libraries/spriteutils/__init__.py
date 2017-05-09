@@ -45,6 +45,6 @@ if use_cython or use_pyximport:
         if not obj.startswith("_") and obj not in cydir:
             msg = "Object {} not found in Cython version, falling back to Python implementation".format(obj)
             warnings.warn(msg)
-
+            
 if not any((use_cython, use_pyximport, use_python)):
     raise ImportError("Couldn't find any valid spriteutils")

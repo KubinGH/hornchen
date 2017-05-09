@@ -5,15 +5,25 @@ import json_ext as json
 from abc_leveltile import AbstractLevelTile
 from colors import Color
 
+print("Load level tiles")
+
+class TileFlags:
+    Passage = 0
+    EnemySpawner = 1
+    RoomDoor = 2
+    PartOfHiddenRoom = 3
+
+#Imported after TileFlags definition, so that it can access it
+import enemies
+
 config = json.load(open("configs/dungeon.json", "r"))
 level_size = config["level_size"]
 tile_size = config["tile_size"]
 tile_size_t = (tile_size, tile_size)
 
-# Namespace
-class TileFlags:
-    Passage = 0
-
+# ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+# ===== ===== =====       Basic Tiles       ===== ===== =====
+# ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 
 class BaseTile(AbstractLevelTile):
     needs_update = False
@@ -54,21 +64,68 @@ class WallTile(BaseTile):
     needs_update = False
     passable = False
     transparent = False
-    drawn_surface = imglib.load_image_from_file("images/dd/env/Wall.png")
-    drawn_surface = imglib.scale(drawn_surface, tile_size_t)
+    drawn_surface = imglib.load_image_from_file("images/dd/env/Wall.png", after_scale=tile_size_t)
 
 class DoorTile(BaseTile):
     needs_update = False
     passable = True
     transparent = False
     flags = {TileFlags.Passage}
-    drawn_surface = imglib.load_image_from_file("images/dd/env/DoorOnWall.png")
-    drawn_surface = imglib.scale(drawn_surface, tile_size_t)
+    drawn_surface = imglib.load_image_from_file("images/dd/env/DoorOnWall.png", after_scale=tile_size_t)
+
+# ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+# ===== ===== =====        Room Tiles       ===== ===== =====
+# ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+
+class HiddenRoomTile(BaseTile):
+    needs_update = False
+    passable = True
+    transparent = False
+    flags = {TileFlags.PartOfHiddenRoom}
+    drawn_surface = imglib.load_image_from_file("images/dd/env/Wall.png", after_scale=tile_size_t)
+    uncovered_drawn_surface = pygame.Surface(tile_size_t)
+    uncovered_drawn_surface.fill(Color.Black)
+    uncovered_drawn_surface.set_colorkey(Color.Black)
+    def __init__(self, level, col_idx, row_idx):
+        super().__init__(level, col_idx, row_idx)
+        self.uncovered = False
+
+    def uncover(self):
+        self.uncovered = True
+        self.drawn_surface = self.uncovered_drawn_surface
+        self.transparent = True
+
+class HiddenRoomDoorTile(HiddenRoomTile):
+    drawn_surface = imglib.load_image_from_file("images/dd/env/DoorOnWall.png", after_scale=tile_size_t)
+
+# ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+# ===== ===== =====         Spawners        ===== ===== =====
+# ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+
+class BaseSpawnerTile(EmptyTile):
+    flags = {TileFlags.EnemySpawner}
+    needs_update = True
+    spawned_enemy = None
+    def __init__(self, level, col_idx, row_idx):
+        super().__init__(level, col_idx, row_idx)
+        self.spawned = False
+
+    def update(self):
+        if not self.spawned:
+            self.spawn = self.spawned_enemy(self.level, self)
+            self.level.sprites.append(self.spawn)
+            self.spawned = True
+
+class GrayGooSpawner(BaseSpawnerTile):
+    spawned_enemy = enemies.GrayGoo
 
 parse_dict = {
     ".": EmptyTile,
     "W": WallTile,
-    "~": DoorTile
+    "~": DoorTile,
+    ",": HiddenRoomTile,
+    "-": HiddenRoomDoorTile,
+    "g": GrayGooSpawner
 }
 
 passage_chars = [k for k, v in parse_dict.items() if TileFlags.Passage in v.flags]

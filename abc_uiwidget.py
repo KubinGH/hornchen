@@ -1,5 +1,7 @@
 import abc
 
+print("Load abstract base class of UI widget")
+
 class AbstractUIWidget(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def __init__(self, game, player):

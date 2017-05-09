@@ -2,6 +2,8 @@ import pygame
 import abc
 import json_ext as json
 
+print("Load abstract base class of level tile")
+
 config = json.load(open("configs/dungeon.json", "r"))
 level_size = config["level_size"]
 tile_size = config["tile_size"]

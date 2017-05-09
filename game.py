@@ -1,5 +1,13 @@
+import copy
+
 from states import TestState, MainMenuState
 from player import PlayerCharacter
+
+print("Load game engine")
+
+def log(*args, **kwargs):
+    args = ("[game]::" + str(args[0]), ) + args[1:]
+    return print(*args, **kwargs)
 
 class GameEngine:
     default_vars = {"screen": None, "draw_surface": None, "screen_size": None,
@@ -19,15 +27,15 @@ class GameEngine:
         pass
 
     def push_state(self, state):
-        print("Push state {} to the stack".format(type(state).__name__))
+        log("Push state {} to the stack".format(type(state).__name__))
         self.state_stack.append(state)
 
     def push_state_t(self, state_type):
-        print("Push state (type) {} to the stack".format(state_type.__name__))
+        log("Push state (type) {} to the stack".format(state_type.__name__))
         self.state_stack.append(state_type(self))
 
     def pop_state(self, i=-1):
-        print("Pop state {} from the stack at index {}".format(type(self.state_stack[i]).__name__, i))
+        log("Pop state {} from the stack at index {}".format(type(self.state_stack[i]).__name__, i))
         return self.state_stack.pop(i)
 
     def handle_events(self, state, events, pressed_keys, mouse_pos, *args, **kwargs):

@@ -1,6 +1,8 @@
 import random
 import levels
 
+print("Load map generator")
+
 def generate_map(dest, maze_gen):
     maze = maze_gen.data
     maze_gen.pprint()
@@ -18,4 +20,4 @@ def generate_map(dest, maze_gen):
             level = random.choice(levels.leveldict[val])
             dest[row][col] = level
     scol, srow = maze_gen.start_pos
-    dest[scol][srow] = levels.start_level
+    dest[scol][srow] = levels.StartLevel

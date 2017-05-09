@@ -1,5 +1,7 @@
 import abc
 
+print("Load abstract base class of level")
+
 class AbstractLevel(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def __init__(self):

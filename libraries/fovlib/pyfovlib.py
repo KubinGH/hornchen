@@ -70,23 +70,3 @@ def cast_light(row, start, end, xx, xy, yx, yy, args):
                     blocked = True
                     cast_light(distance + 1, start, left_slope, xx, xy, yx, yy, args)
                 new_start = right_slope
-
-
-if __name__ == "__main__":
-    example = [
-        [1, 1, 1, 1, 1, 1, 1, 1, 1],
-        [1, 1, 1, 1, 1, 1, 1, 1, 1],
-        [1, 1, 1, 1, 1, 1, 1, 1, 1],
-        [1, 1, 1, 1, 1, 1, 1, 1, 1],
-        [1, 1, 1, 1, 1, 1, 1, 1, 1],
-        [1, 1, 1, 1, 1, 1, 1, 1, 1],
-        [1, 1, 1, 0, 0, 0, 1, 1, 1],
-        [1, 1, 1, 1, 1, 1, 1, 1, 1],
-        [1, 1, 1, 1, 1, 1, 1, 1, 1]
-    ]
-
-    result = calculate_fov(example, 4, 4, 7)
-    print("Done")
-
-    for row in result:
-        print([e for e in row])

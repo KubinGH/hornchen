@@ -1,6 +1,8 @@
 import pygame
 import warnings
 
+print("Load font utilities")
+
 def log(*args, **kwargs):
     args = ("[fontutils]::" + str(args[0]), ) + args[1:]
     return print(*args, **kwargs)
@@ -9,11 +11,17 @@ def color_as_tuple(pgcolor):
     return (pgcolor.r, pgcolor.g, pgcolor.b, pgcolor.a)
 
 font_cache = {}
-def get_font(source, size):
+def get_font(source, size, ignore_missing=True):
     pair = (source, size)
     if pair not in font_cache:
         log("Load font:", pair)
-        font_cache[pair] = pygame.font.Font(source, size)
+        try:
+            font_cache[pair] = pygame.font.Font(source, size)
+        except OSError:
+            if ignore_missing:
+                return pygame.font.SysFont("monospace", size)
+            else:
+                raise
     return font_cache[pair]
 
 def get_sysfont(source, size, bold=False, italic=False):

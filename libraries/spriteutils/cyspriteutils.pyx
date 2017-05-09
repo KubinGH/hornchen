@@ -27,8 +27,8 @@ cpdef move_in_level(list layout, dict moving, int row, int col, object rect, int
         if lft_in and (imp_col(layout, next_rect, col - 1, row) or \
            (top_in and imp_col(layout, next_rect, col - 1, row - 1)) or \
            (bot_in and imp_col(layout, next_rect, col - 1, row + 1))):
-          collided = True
-          rect.left = layout[row][col - 1].rect.right
+            collided = True
+            rect.left = layout[row][col - 1].rect.right
         if not collided:
             rect = next_rect
 
@@ -38,8 +38,8 @@ cpdef move_in_level(list layout, dict moving, int row, int col, object rect, int
         if rgt_in and (imp_col(layout, next_rect, col + 1, row) or \
            (top_in and imp_col(layout, next_rect, col + 1, row - 1)) or \
            (bot_in and imp_col(layout, next_rect, col + 1, row + 1))):
-          collided = True
-          rect.right = layout[row][col + 1].rect.left
+            collided = True
+            rect.right = layout[row][col + 1].rect.left
         if not collided:
             rect = next_rect
 
@@ -49,8 +49,8 @@ cpdef move_in_level(list layout, dict moving, int row, int col, object rect, int
         if top_in and (imp_col(layout, next_rect, col, row - 1) or \
            (lft_in and imp_col(layout, next_rect, col - 1, row - 1)) or \
            (rgt_in and imp_col(layout, next_rect, col + 1, row - 1))):
-          collided = True
-          rect.top = layout[row - 1][col].rect.bottom
+            collided = True
+            rect.top = layout[row - 1][col].rect.bottom
         if not collided:
             rect = next_rect
 
@@ -60,8 +60,8 @@ cpdef move_in_level(list layout, dict moving, int row, int col, object rect, int
         if bot_in and (imp_col(layout, next_rect, col, row + 1) or \
            (lft_in and imp_col(layout, next_rect, col - 1, row + 1)) or \
            (rgt_in and imp_col(layout, next_rect, col + 1, row + 1))):
-          collided = True
-          rect.bottom = layout[row + 1][col].rect.top
+            collided = True
+            rect.bottom = layout[row + 1][col].rect.top
         if not collided:
             rect = next_rect
 
@@ -79,7 +79,7 @@ def get_tiles_next_to(object sprite):
         bint lft, rgt, top, bot
     if pair not in sprite.next_to_cache:
         sprite.next_to_cache[pair] = []
-        level_cols, level_rows = sprite.current_level.layout_size
+        level_cols, level_rows = sprite.level.layout_size
         lft = rgt = top = bot = False
         if col > 0:
             lft = True; sprite.next_to_cache[pair].append((col - 1, row))

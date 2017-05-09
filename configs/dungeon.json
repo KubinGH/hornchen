@@ -4,5 +4,7 @@
     "level_surface_size": [1024, 512],
     "level_surface_position": [0, 256],
     "topbar_size": [1024, 256],
-    "topbar_position": [0, 0]
+    "topbar_position": [0, 0],
+    "border_color": [0, 29, 109],
+    "border_thickness": 3
 }

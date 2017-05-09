@@ -67,7 +67,7 @@ def get_tiles_next_to(sprite):
     col, row = pair
     if pair not in sprite.next_to_cache:
         sprite.next_to_cache[pair] = []
-        level_cols, level_rows = sprite.current_level.layout_size
+        level_cols, level_rows = sprite.level.layout_size
         lft = rgt = top = bot = False
         if col > 0:
             lft = True; sprite.next_to_cache[pair].append((col - 1, row))

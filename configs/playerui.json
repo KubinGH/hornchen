@@ -9,5 +9,10 @@
 
     "heart_size": [40, 40],
     "hearts_gap": 8,
-    "hearts_pos": [2, 2]
+    "hearts_pos": [2, 2],
+
+    "selected_item_box_pos": [640, 20],
+    "selected_item_box_size": [80, 100],
+    "selected_item_box_icon_move": [8, 28],
+    "selected_item_box_icon_size": [64, 64]
 }

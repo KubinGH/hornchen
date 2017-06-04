@@ -21,80 +21,25 @@ reverse_directions = {"left": "right", "right": "left",
 directions_base = {"left": "left", "right": "right", 
                   "top": "up", "bottom": "down"}
 
-# ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
-# ===== ===== =====        Test State       ===== ===== =====
-# ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
-
-class TestState(AbstractGameState):
-    def __init__(self, game):
-        super().__init__(game)
-
-        self.rect = pygame.rect.Rect(0, 0, 40, 40)
-        self.last_rect = None
-        self.step = 4
-        self.changed = False
-        self.force_refresh = True
-
-    def cleanup(self):
-        super().cleanup()
-
-    def pause(self):
-        super().pause()
-
-    def resume(self):
-        super().resume()
+class UIButton:
+    def __init__(self, name, text, font, pos, colors=(Color.White, Color.Yellow)):
+        self.name = name
+        self.text, self.font = text, font
+        self.pos, self.colors = pos, colors
+        self.text_renders = [fontutils.get_text_render(self.font, text, True, color) for color in self.colors]
+        self.rect = pygame.Rect(self.pos, self.text_renders[0].get_size())
+        self.hovered_over = False
+        self.pressed = False
 
     def handle_events(self, events, pressed_keys, mouse_pos):
-        for event in events:
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_a:
-                    self.step = 4 if self.step != 4 else 12
-                elif event.key == pygame.K_e:
-                    self.game.pop_state()
-                    self.cleanup()
-                elif event.key == pygame.K_ESCAPE:
-                    self.game.push_state(PauseState(self.game))
-        self.last_rect = self.rect.copy()
-        self.changed = False
-        if pressed_keys[pygame.K_LEFT]:
-            if self.rect.x - self.step >= 0:
-                self.rect.x -= self.step
-                self.changed = True
-            else:
-                self.rect.x = 0
-        if pressed_keys[pygame.K_RIGHT]:
-            if self.rect.x + self.rect.width + self.step <= self.game.vars["screen_size"][0]:
-                self.rect.x += self.step
-                self.changed = True
-            else:
-                self.rect.x = self.game.vars["screen_size"][0] - self.rect.width
-        if pressed_keys[pygame.K_UP]:
-            if self.rect.y - self.step >= 0:
-                self.rect.y -= self.step
-                self.changed = True
-            else:
-                self.rect.y = 0
-        if pressed_keys[pygame.K_DOWN]:
-            if self.rect.y + self.rect.height + self.step <= self.game.vars["screen_size"][1]:
-                self.rect.y += self.step
-                self.changed = True
-            else:
-                self.rect.y = self.game.vars["screen_size"][1] - self.rect.height
+        self.hovered_over = self.rect.collidepoint(mouse_pos)
+        self.pressed = self.hovered_over and any(event.type == pygame.MOUSEBUTTONDOWN for event in events)
 
     def update(self):
         pass
 
     def draw(self, screen):
-        if self.changed or self.force_refresh:
-            self.changed = False
-            pygame.draw.rect(screen, Color.Black, self.last_rect)
-            pygame.draw.rect(screen, Color.Red,  self.rect)
-            if self.force_refresh:
-                return None
-            else:
-                return [self.last_rect, self.rect]
-        else:
-            return []
+        screen.blit(self.text_renders[self.hovered_over], self.rect)
 
 # ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 # ===== ===== =====     Main Menu State     ===== ===== =====
@@ -102,7 +47,7 @@ class TestState(AbstractGameState):
 
 class MainMenuState(AbstractGameState):
     lazy_state = True
-    config = json.load(open("configs/mainmenu.json", "r"))
+    config = json.loadf("configs/mainmenu.json")
     def __init__(self, game):
         super().__init__(game)
 
@@ -115,59 +60,30 @@ class MainMenuState(AbstractGameState):
         self.font_large = fontutils.get_font("fonts/OldLondon.ttf", self.config["fonts"]["sizes"]["font_large"])
         self.title_text = fontutils.get_text_render(self.font_large, "Hornchen", True, Color.White)
 
-        btext_pair = lambda text: [fontutils.get_text_render(self.font, text, True, Color.White), 
-                                   fontutils.get_text_render(self.font, text, True, Color.Yellow)]
-        self.buttons = {
-            "start": btext_pair("Start"),
-            "settings": btext_pair("Settings")
-        }
-        self.mouse_hovering_over = {key: False for key in self.buttons}
-        self.pressed_buttons = {key: False for key in self.buttons}
-        self.button_rects = {key: pygame.Rect(self.config["positions"]["buttons"][key], 
-                                              self.buttons[key][0].get_size()) 
-                             for key in self.buttons}
-
-    def cleanup(self):
-        super().cleanup()
-
-    def pause(self):
-        super().pause()
-
-    def resume(self):
-        super().resume()
+        self.buttons_list = [
+            UIButton("start", "Start", self.font, self.config["positions"]["buttons"]["start"]),
+            UIButton("settings", "Settings", self.font, self.config["positions"]["buttons"]["settings"])
+        ]
+        self.buttons = {button.name: button for button in self.buttons_list}
 
     def handle_events(self, events, pressed_keys, mouse_pos):
-        self.mouse_hovering_over = {key: False for key in self.buttons}
-        self.pressed_buttons = {key: False for key in self.buttons}
-
-        for key, rect in self.button_rects.items():
-            if rect.collidepoint(mouse_pos):
-                self.mouse_hovering_over[key] = True
+        for button in self.buttons_list:
+            button.handle_events(events, pressed_keys, mouse_pos)
 
         for event in events:
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                for key in self.buttons:
-                    if self.mouse_hovering_over[key]:
-                        print("MainMenu::Pressed", key)
-                        self.pressed_buttons[key] = True
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:
-                    self.pressed_buttons["start"] = True
+                    buttons["start"].pressed = True
 
     def update(self):
-        if self.pressed_buttons["start"]:
+        if self.buttons["start"].pressed:
             self.start_game()
 
     def draw(self, screen):
         screen.blit(self.background, TOPLEFT)
-
         screen.blit(self.title_text, self.config["positions"]["title_text"])
-
-        for key, value in self.buttons.items():
-            pos = self.config["positions"]["buttons"][key]
-            used = self.buttons[key][self.mouse_hovering_over[key]]
-            screen.blit(used, pos)
-
+        for button in self.buttons_list:
+            button.draw(screen)
         self.border_drawer.draw(screen, TOPLEFT)
 
     def start_game(self):
@@ -189,7 +105,7 @@ class MainMenuState(AbstractGameState):
 
 class PauseState(AbstractGameState):
     lazy_state = True
-    config = json.load(open("configs/pause.json", "r"))   
+    config = json.loadf("configs/pause.json")   
     pause_window_size = config["sizes"]["pause_window"]
     pause_window_pos = config["positions"]["pause_window"]
     pause_text_pos = config["positions"]["pause_text"]
@@ -224,55 +140,37 @@ class PauseState(AbstractGameState):
 
         btext_pair = lambda text: [fontutils.get_text_render(self.font, text, True, Color.White), 
                                    fontutils.get_text_render(self.font, text, True, Color.Yellow)]
-        self.buttons = {
-            "return": btext_pair("Return"),
-            "exit":   btext_pair(" Exit ")
-        }
-        self.mouse_hovering_over = {key: False for key in self.buttons}
-        self.pressed_buttons = {key: False for key in self.buttons}
-        self.button_rects = {key: pygame.Rect(self.config["positions"]["buttons"][key], 
-                                              self.buttons[key][0].get_size()) 
-                             for key in self.buttons}
+        self.buttons_list = [
+            UIButton("return", "Return", self.font, self.config["positions"]["buttons"]["return"]),
+            UIButton("exit", "Exit", self.font, self.config["positions"]["buttons"]["exit"])
+        ]
+        self.buttons = {button.name: button for button in self.buttons_list}
 
         self.leaving = False
 
-    def cleanup(self):
-        super().cleanup()
-
-    def pause(self):
-        super().pause()
-
-    def resume(self):
-        super().resume()
-
     def handle_events(self, events, pressed_keys, mouse_pos):        
-        self.mouse_hovering_over = {key: False for key in self.buttons}
-        self.pressed_buttons = {key: False for key in self.buttons}
-
-        for key, rect in self.button_rects.items():
-            if rect.collidepoint(mouse_pos):
-                self.mouse_hovering_over[key] = True
+        for button in self.buttons_list:
+            button.handle_events(events, pressed_keys, mouse_pos)
 
         for event in events:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     self.leaving = True
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                for key in self.buttons:
-                    if self.mouse_hovering_over[key]:
-                        self.pressed_buttons[key] = True
 
     def update(self):
-        if self.pressed_buttons["return"]:
+        for button in self.buttons_list:
+            button.update()
+
+        if self.buttons["return"].pressed:
             self.leaving = True
 
-        if self.pressed_buttons["exit"]:
+        if self.buttons["exit"].pressed:
             self.game.pop_state()
             self.cleanup()
             while not isinstance(self.game.top_state, MainMenuState):
                 nxt = self.game.pop_state()
                 nxt.cleanup()
-            print("Cache cleared by PauseState")
+            print("Level caches cleared by PauseState")
             self.game.vars["level_caches"] = {}
             return
 
@@ -282,10 +180,8 @@ class PauseState(AbstractGameState):
 
     def draw(self, screen):
         screen.blit(self.parent_surface, TOPLEFT)
-        for key, value in self.buttons.items():
-            pos = self.config["positions"]["buttons"][key]
-            used = self.buttons[key][self.mouse_hovering_over[key]]
-            screen.blit(used, pos)
+        for button in self.buttons_list:
+            button.draw(screen)
 
 
 # ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
@@ -297,10 +193,10 @@ class PauseState(AbstractGameState):
 # player will be created.
 
 class DungeonState(AbstractGameState):
-    config = json.load(open("configs/dungeon.json", "r"))
+    config = json.loadf("configs/dungeon.json")
     tile_size = config["tile_size"]
     pos_fix = config["level_surface_position"]
-    config_ui = json.load(open("configs/playerui.json"))
+    config_ui = json.loadf("configs/playerui.json")
     def __init__(self, game, *, level, entry_dir="any", player=None, run_interlude=False):
         super().__init__(game)
 
@@ -328,20 +224,14 @@ class DungeonState(AbstractGameState):
         self.player.on_new_level()
         self.level.update()
 
-    def cleanup(self):
-        super().cleanup()
-
-    def pause(self):
-        super().pause()
-
-    def resume(self):
-        super().resume()
-
     def handle_events(self, events, pressed_keys, mouse_pos):
         for event in events:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     self.game.push_state(PauseState(self.game))
+                elif event.key == pygame.K_i:
+                    # parent_surface is implicitly set to a copy of the current screen
+                    self.game.push_state(PlayerInventoryState(self.game, parent_surface=None))
         self.level.handle_events(events, pressed_keys, mouse_pos)
         self.player.handle_events(events, pressed_keys, mouse_pos)
 
@@ -391,7 +281,9 @@ class DungeonState(AbstractGameState):
         if newlevel is None:
             newlevel = levels.EmptyLevel
         if (next_x, next_y) in self.game.vars["level_caches"]:
-            newlevelobj = newlevel.load_from_cache(self.game.vars["level_caches"][(next_x, next_y)])
+            cache = self.game.vars["level_caches"][(next_x, next_y)]
+            print("Cache: {}".format(cache))
+            newlevelobj = newlevel.load_from_cache(cache)
         else:
             newlevelobj = newlevel()
         new_state = DungeonState(self.game, level=newlevelobj, entry_dir=entry_dir, 
@@ -478,15 +370,6 @@ class InterludeState(AbstractGameState):
             self.surface.blit(self.first, (0, second_h))
             self.ticks_left = second_h // speed
 
-    def cleanup(self):
-        super().cleanup()
-
-    def pause(self):
-        super().pause()
-
-    def resume(self):
-        super().resume()
-
     def handle_events(self, events, pressed_keys, mouse_pos):
         pass
 
@@ -522,6 +405,106 @@ class InterludeState(AbstractGameState):
             screen.blit(surface, pos)
         for drawer, pos in self.drawers:
             drawer.draw(screen, pos)
+
+
+# ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+# ===== ===== ===== Player Inventory State  ===== ===== =====
+# ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+
+class PlayerInventoryState(AbstractGameState):
+    config = json.loadf("configs/player_inventory.json")
+    window_size = config["window_size"]
+    window_pos = config["position"]
+    slots_start_pos = config["slots_start"]
+    slot_size_t = config["slot_size"]
+    slot_size = slot_size_t[0]
+    slots_gap = config["slots_gap"]
+    slot_border_width = config["slot_border_width"]
+    slot_cols, slot_rows = config["slot_cols"], config["slot_rows"]
+    lazy_state = True
+    def __init__(self, game, *, parent_surface=None):
+        super().__init__(game)
+
+        self.player = self.game.player
+        self.inventory = self.player.inventory
+
+        if parent_surface is None:
+            if "screen" in self.game.vars:
+                self.parent_surface = self.game.vars["screen"]
+            else:
+                self.parent_surface = pygame.Surface(self.game.vars["screen_size"])
+                self.parent_surface.fill(Color.Black)
+        else:
+            self.parent_surface = parent_surface
+        self.surface = self.parent_surface.copy()
+
+        self.back_dimmer = pygame.Surface(self.game.vars["screen_size"])
+        self.back_dimmer.fill(Color.Black)
+        self.back_dimmer.set_alpha(125)
+        self.surface.blit(self.back_dimmer, TOPLEFT)
+
+        self.bg_tile = imglib.load_image_from_file("images/dd/env/BricksSmall.png", after_scale=(20, 20))
+        self.border_tile = imglib.load_image_from_file("images/dd/env/Wall.png", after_scale=(20, 20))
+        self.background = imglib.repeated_image_texture(self.bg_tile, self.window_size)
+        self.surface.blit(self.background, self.window_pos)
+        self.background_border = imglib.image_border(self.window_size, self.border_tile)
+        self.surface.blit(self.background_border, self.window_pos)
+
+        self.slot_img = imglib.load_image_from_file("images/sl/player_inv/slot.png", after_scale=self.slot_size_t)
+        startx, starty = self.slots_start_pos
+        self.slot_positions = []
+        self.item_icon_positions = []
+        for row in range(self.slot_rows):
+            y = starty + row * (self.slot_size + self.slots_gap)
+            for col in range(self.slot_cols):
+                x = startx + col * (self.slot_size + self.slots_gap)
+                index = x * self.slot_cols + row
+                self.surface.blit(self.slot_img, (x, y))
+                self.slot_positions.append((x, y))
+                xi, yi = x + self.slot_border_width, y + self.slot_border_width
+                self.item_icon_positions.append((xi, yi))
+        self.selected_slot_img = imglib.load_image_from_file("images/sl/player_inv/selected_slot.png", after_scale=self.slot_size_t)
+
+        if self.player.near_container is not None:
+            self.container = self.player.near_container
+            self.c_slot_positions = []
+            self.c_item_icon_positions = []
+
+        self.selected = list(divmod(self.player.selected_item_idx, self.slot_cols))[::-1]
+        self.leaving = False
+
+    def cleanup(self):
+        self.player.selected_item_idx = self.selected[0] + self.selected[1] * self.slot_cols
+
+    def handle_events(self, events, pressed_keys, mouse_pos):
+        for event in events:
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE or event.key == pygame.K_i:
+                    self.leaving = True
+                elif event.key == pygame.K_LEFT:
+                    if self.selected[0] > 0:
+                        self.selected[0] -= 1
+                elif event.key == pygame.K_RIGHT:
+                    if self.selected[0] < self.slot_cols - 1:
+                        self.selected[0] += 1
+                elif event.key == pygame.K_UP:
+                    if self.selected[1] > 0: 
+                        self.selected[1] -= 1
+                elif event.key == pygame.K_DOWN:
+                    if self.selected[1] < self.slot_rows - 1:
+                        self.selected[1] += 1
+
+    def update(self):
+        if self.leaving:
+            self.game.pop_state()
+            self.cleanup()
+
+    def draw(self, screen):
+        screen.blit(self.surface, TOPLEFT)
+        screen.blit(self.selected_slot_img, self.slot_positions[self.selected[0] + self.selected[1] * self.slot_cols])
+        for pos, item in zip(self.item_icon_positions, self.inventory.slots):
+            if item is not None and hasattr(item, "icon"):
+                screen.blit(item.icon, pos)
 
 
 # ===== ===== ===== ===== ===== ===== ===== ===== ===== =====

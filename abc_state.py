@@ -17,7 +17,6 @@ class AbstractGameState(metaclass=abc.ABCMeta):
         self.paused = False
         self.deactivated = False
 
-    @abc.abstractmethod
     def cleanup(self):
         """
         Called when this thread is not going to be used anymore
@@ -27,7 +26,6 @@ class AbstractGameState(metaclass=abc.ABCMeta):
         print("Deactivated state", self.__class__.__name__)
         self.deactivated = True
     
-    @abc.abstractmethod    
     def pause(self):
         """
         Pause this state for now. It will be later unpaused with 
@@ -37,7 +35,6 @@ class AbstractGameState(metaclass=abc.ABCMeta):
         print("Paused state", self.__class__.__name__)
         self.paused = True
         
-    @abc.abstractmethod
     def resume(self):
         """
         Unpause this state after a period of pause.

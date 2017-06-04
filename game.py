@@ -1,6 +1,6 @@
 import copy
 
-from states import TestState, MainMenuState
+from states import MainMenuState
 from player import PlayerCharacter
 
 print("Load game engine")
@@ -10,8 +10,11 @@ def log(*args, **kwargs):
     return print(*args, **kwargs)
 
 class GameEngine:
-    default_vars = {"screen": None, "draw_surface": None, "screen_size": None,
-                    "level_caches": {}, "map": None, "enable_fov": False}
+    default_vars = {
+        "screen": None, "draw_surface": None, "screen_size": None,
+        "level_caches": {}, "map": None, 
+        "enable_fov": False, "enable_enemy_hp_bars": True
+    }
     def __init__(self, **kwargs):
         self.vars = self.default_vars.copy()
         self.vars.update(kwargs)

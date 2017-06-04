@@ -8,7 +8,7 @@ from abc_uiwidget import AbstractUIWidget
 
 print("Load player UI")
 
-config_ui = json.load(open("configs/playerui.json"))
+config_ui = json.loadf("configs/playerui.json")
 minimap_tile = config_ui["minimap_blocksize"]
 minimap_tile_t = (minimap_tile, minimap_tile)
 minimap_tiles = config_ui["minimap_tiles"]
@@ -128,3 +128,29 @@ class HeartsWidget(AbstractUIWidget):
 
     def draw(self, screen):
         screen.blit(self.heart_surface, config_ui["hearts_pos"])
+
+
+class SelectedItemBoxWidget(AbstractUIWidget):
+    box_pos = config_ui["selected_item_box_pos"]
+    box_size = config_ui["selected_item_box_size"]
+    icon_move = config_ui["selected_item_box_icon_move"]
+    icon_pos = (box_pos[0] + icon_move[0], box_pos[1] + icon_move[1])
+    icon_size = config_ui["selected_item_box_icon_size"]
+    box_image = imglib.load_image_from_file("images/sl/ui/selected_item_box.png", after_scale=box_size)
+    def __init__(self, game, player):
+        super().__init__(game, player)
+        self.last_selected = self.last_icon = None
+        self.update()
+
+    def update(self):
+        if self.player.selected_item is not self.last_selected:
+            if self.last_selected is not self.player.inventory.empty_slot:
+                del imglib.scale_cache[(self.last_selected.icon, self.icon_size)]
+            self.last_selected = self.player.selected_item
+            if self.last_selected is not self.player.inventory.empty_slot:
+                self.scaled_icon = imglib.scale(self.last_selected.icon, self.icon_size)
+
+    def draw(self, screen):
+        screen.blit(self.box_image, self.box_pos)
+        if self.player.selected_item is not self.player.inventory.empty_slot:
+            screen.blit(self.scaled_icon, self.icon_pos)

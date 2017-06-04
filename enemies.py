@@ -12,14 +12,14 @@ print("Load enemies")
 
 base_directions = ["left", "right", "up", "down"]
 
-#class TileFlags:
-#    PartOfHiddenRoom = 3
-
 class BaseEnemy(BaseSprite):
+    hostile = True
     move_speed = 0
     damage = 0
     max_health_points = 1
     damage_on_player_touch = False
+    hp_bar_gap = 4
+    hp_bar_size = (32, 2)
     def __init__(self, level, spawner_tile):
         super().__init__()
         self.level, self.spawner_tile = level, spawner_tile
@@ -30,17 +30,54 @@ class BaseEnemy(BaseSprite):
     def __repr__(self):
         return "<{} @ {}>".format(type(self).__name__, self.rect.topleft)
 
-    def update(self, player):
+    def update(self):
+        player = self.level.parent.player
+        if self.health_points <= 0:
+            self.level.sprites.remove(self)
+            self.level.precache["sprites"].append(self.create_cache())
+
         if self.damage_on_player_touch and player is not None:
             if self.rect.colliderect(player.rect):
                 player.take_damage(self.damage)
+
+    def draw(self, screen, pos_fix=(0, 0)):
+        enable_hp_bar = self.level.parent.game.vars["enable_enemy_hp_bars"]
+        if enable_hp_bar:
+            nearby = self.get_tiles_next_to() + [self.closest_tile_index]
+            show_bar = False
+            if self.health_points < self.max_health_points:
+                for col, row in nearby:
+                    tile = self.level.layout[row][col]
+                    if tile.passable and tile.flags.PartOfHiddenRoom and not tile.uncovered:
+                        break
+                else:
+                    show_bar = True
+            if show_bar:
+                pos = self.hp_bar_rect.topleft
+                if self.dead:
+                    pygame.draw.rect(screen, Color.Red, self.hp_bar_rect.move(pos_fix))
+                else:
+                    px_healthy = min(round(self.health_points / self.max_health_points * self.hp_bar_size[0]), self.hp_bar_size[0])
+                    px_damaged = self.hp_bar_size[0] - px_healthy
+                    healthy_rect = pygame.Rect(pos, (px_healthy, self.hp_bar_size[1]))
+                    pygame.draw.rect(screen, Color.Green, healthy_rect.move(pos_fix))
+                    if px_damaged:
+                        damaged_rect = pygame.Rect((pos[0] + px_healthy, pos[1]), (px_damaged, self.hp_bar_size[1]))
+                        pygame.draw.rect(screen, Color.Red, damaged_rect.move(pos_fix))
+        super().draw(screen, pos_fix)
+
+    @property
+    def hp_bar_rect(self):
+        pos = (self.rect.centerx - self.hp_bar_size[0]/2, self.rect.bottom + self.hp_bar_gap)
+        return pygame.Rect(pos, self.hp_bar_size)
 
     def create_cache(self):
         return {
             "cls": type(self),
             "rect": self.rect,
             "levelpos": (self.spawner_tile.col_idx, self.spawner_tile.row_idx),
-            "health_points": self.health_points
+            "health_points": self.health_points,
+            "alive": self.dead
         }
 
     @classmethod
@@ -56,9 +93,11 @@ class BaseEnemy(BaseSprite):
             self.health_points = self.max_health_points
 
     def heal(self, value):
-        self.health_points += value
-        if self.health_points > self.max_health_points:
-            self.health_points = self.max_health_points
+        self.take_damage(-value)
+
+    @property
+    def dead(self):
+        return self.health_points <= 0
 
 class GrayGoo(BaseEnemy):
     move_speed = 1
@@ -73,8 +112,8 @@ class GrayGoo(BaseEnemy):
         self.moving = {k: False for k in base_directions}
         self.set_random_move_direction()
 
-    def update(self, player):
-        super().update(player)
+    def update(self):
+        super().update()
         last_rect = self.rect
         if not self.ticks_to_wait:
             self.moving[self.direction] = True

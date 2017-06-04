@@ -41,7 +41,7 @@ class GameConsole:
     class Status:
         Standby = 0
         Interpret = 1
-    config = json.load(open("configs/console.json", "r"))
+    config = json.loadf("configs/console.json")
     size = config["console_size"]
     background_color = config["console_background_color"]
     font = fontutils.get_font("fonts/camingocode.ttf", 16)
@@ -71,6 +71,7 @@ class GameConsole:
     def __init__(self, parent):
         self.parent = parent
         self.interpreter = EmbeddedInterpreter()
+        self.background = self.get_empty_background_surface()
         self.output = self.get_empty_output_surface()
         self.rect = self.output.get_rect()
         self.rect.x, self.rect.y = 0, 0
@@ -81,9 +82,12 @@ class GameConsole:
     def update(self, mouse_pos, pressed_keys, events, namespace=None):
         self.changed = False
         interpret_status = False
+        edited_events = []
         shift = shift_pressed(pressed_keys)
         for event in events:
+            mute = False
             if event.type == pygame.KEYDOWN:
+                mute = True
                 if event.key in self.valid_chars:
                     key = event.key
                     if shift:
@@ -113,21 +117,33 @@ class GameConsole:
                         self.current_line = self.last_line
                         self.last_line = None
                         self.re_render_current()
+                else:
+                    mute = False
+            if not mute:
+                edited_events.append(event)
+        events.clear(); events.extend(edited_events)
         if interpret_status:
             return self.Status.Interpret
         else:
             return self.Status.Standby
 
     def draw(self, screen):
+        screen.blit(self.background, self.rect)
         screen.blit(self.output, self.rect)
         screen.blit(self.current_line_render, self.current_line_pos)
         if self.changed:
             return self.rect
 
-    def get_empty_output_surface(self):
+    def get_empty_background_surface(self):
         surface = pygame.Surface(self.size)
         surface.fill(self.background_color[:3])
         surface.set_alpha(self.background_color[3])
+        return surface
+
+    def get_empty_output_surface(self):
+        surface = pygame.Surface(self.size)
+        surface.fill(Color.Black)
+        surface.set_colorkey(Color.Black)
         return surface
 
     def re_render_current(self):

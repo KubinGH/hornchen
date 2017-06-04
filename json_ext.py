@@ -1,4 +1,8 @@
 from json import *
+import zipopen
+
+if zipopen.enable_resource_zip:
+    open = zipopen.open
 
 print("Load JSON parser")
 
@@ -20,3 +24,6 @@ def load(file, arrays_to_tuples=True):
                             current[key] = tuple(current[key])
         json_cache[params] = this
     return json_cache[params]
+
+def loadf(filename, arrays_to_tuples=True):
+    return load(open(filename, "r"), arrays_to_tuples)

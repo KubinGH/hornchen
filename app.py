@@ -27,7 +27,7 @@ from dirtyrects import DirtyRectsHandler, DummyRectsHandler
 from colors import Color
 import gameconsole
 # These are imported to be used by the console
-import states, leveltiles, enemies
+import states, leveltiles, enemies, playeritems
 
 
 def alt_pressed(pressed_keys):
@@ -53,7 +53,8 @@ class App:
         "math": math,
         "states": states,
         "leveltiles": leveltiles,
-        "enemies": enemies
+        "enemies": enemies,
+        "playeritems": playeritems
     }
     def __init__(self, screen=None, use_dirty_rects=False):
         self.screen = screen
@@ -72,9 +73,10 @@ class App:
         act_max_fps = max_fps
         console_enabled = False
         # Console functions
-        def spawn_enemy(cls, col, row):
-            return current_state.level.sprites.append(cls(current_state.level,
-                                                      current_state.level.layout[row][col]))
+        def spawn_enemy(cls, col, row, count=1):
+            for _ in range(count):
+                current_state.level.sprites.append(cls(current_state.level,
+                                                   current_state.level.layout[row][col]))
         def _search_func(seq, cond_func):
             search = [elem for elem in seq if cond_func(elem)]
             if not search:
@@ -85,10 +87,17 @@ class App:
             return _search_func(current_state.level.sprites, lambda sprite: type(sprite) is cls)
         def get_sprite_by_class(cls):
             return get_sprites_by_class(cls)[0]
+        def give(arg):
+            if isinstance(arg, str):
+                cls = getattr(playeritems, arg)
+            else:
+                cls = arg
+            return player.inventory.add_item(cls(player))
         console_functions = [spawn_enemy, get_sprite_by_class]
         self.console_namespace_additions.update({func.__name__: func for func in console_functions})
 
         # Main loop
+        pause = False
         ticks = 0
         clock = pygame.time.Clock()
         running = True
@@ -113,17 +122,29 @@ class App:
                         else:
                             flags = NORMAL_FLAGS
                         pygame.display.set_mode(WINDOW_SIZE, flags)
-                    elif event.key == pygame.K_f and shift_pressed(pressed_keys):
-                        act_max_fps = next(max_fps_vals)
-                        print("set max fps", act_max_fps)
+                    elif shift_pressed(pressed_keys):
+                        if event.key == pygame.K_f:
+                            act_max_fps = next(max_fps_vals)
+                            print("Set max FPS to", act_max_fps)
+                        elif event.key == pygame.K_h:
+                            self.game.vars["enable_enemy_hp_bars"] = not self.game.vars["enable_enemy_hp_bars"]
+                        elif event.key == pygame.K_p:
+                            pause = not pause
+            if pause:
+                continue
             last_state = current_state
             current_state = self.game.top_state
             if current_state is None: 
-                raise AssertionError("No current state")
+                raise RuntimeError("No current state")
             if last_state != current_state and last_state is not None and not last_state.deactivated:
                 last_state.pause()
             if current_state.paused:
                 current_state.resume()
+
+            # Some events (e.g. letter keypresses) are muted by the console,
+            # so we need to process it first.
+            if console_enabled:
+                constatus = self.console.update(mouse_pos, pressed_keys, events)
 
             self.game.handle_events(current_state, events, pressed_keys, mouse_pos)
             pygame.event.pump()
@@ -140,8 +161,7 @@ class App:
             recthandler.add_iter(gamerects)
 
             if console_enabled:
-                status = self.console.update(mouse_pos, pressed_keys, events)
-                if status is self.console.Status.Interpret:
+                if constatus is self.console.Status.Interpret:
                     namespace = locals()
                     namespace.update(self.console_namespace_additions)
                     self.console.interpret_current(namespace)
@@ -185,6 +205,6 @@ if __name__ == "__main__":
     profiler.disable()
     profiler.dump_stats("profile.stats")
     stats = pstats.Stats("profile.stats")
-    stats.strip_dirs(); stats.sort_stats("cumulative")
+    stats.strip_dirs(); stats.sort_stats("ncalls")
     stats.print_stats()
 

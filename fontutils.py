@@ -1,5 +1,12 @@
 import pygame
 import warnings
+import zipopen
+
+load_font = pygame.font.Font
+
+if zipopen.enable_resource_zip:
+    def load_font(source, size):
+        return pygame.font.Font(zipopen.open(source, "rb"), size)
 
 print("Load font utilities")
 
@@ -16,7 +23,7 @@ def get_font(source, size, ignore_missing=True):
     if pair not in font_cache:
         log("Load font:", pair)
         try:
-            font_cache[pair] = pygame.font.Font(source, size)
+            font_cache[pair] = load_font(source, size)
         except OSError:
             if ignore_missing:
                 return pygame.font.SysFont("monospace", size)

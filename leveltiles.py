@@ -1,22 +1,35 @@
+import enum
+
 import pygame
 
 import imglib
 import json_ext as json
 from abc_leveltile import AbstractLevelTile
 from colors import Color
+import enemies
+from inventory import BaseInventory
 
 print("Load level tiles")
 
-class TileFlags:
+class TileFlags(enum.Enum):
     Passage = 0
     EnemySpawner = 1
     RoomDoor = 2
     PartOfHiddenRoom = 3
+    Container = 4
 
-#Imported after TileFlags definition, so that it can access it
-import enemies
+class FlagSet:
+    def __init__(self, *flags):
+        self.flagset = set(flags)
+        self.nameset = set(flag.name for flag in flags)
 
-config = json.load(open("configs/dungeon.json", "r"))
+    def __getattr__(self, name):
+        return name in self.nameset
+
+    def copy(self):
+        return FlagSet(*self.flagset)
+
+config = json.loadf("configs/dungeon.json")
 level_size = config["level_size"]
 tile_size = config["tile_size"]
 tile_size_t = (tile_size, tile_size)
@@ -29,9 +42,10 @@ class BaseTile(AbstractLevelTile):
     needs_update = False
     passable = True
     transparent = True
-    flags = set()
+    flags_template = FlagSet()
     def __init__(self, level, col_idx, row_idx):
         super().__init__(level, col_idx, row_idx)
+        self.flags = self.flags_template.copy()
 
     def update(self):
         pass
@@ -70,7 +84,7 @@ class DoorTile(BaseTile):
     needs_update = False
     passable = True
     transparent = False
-    flags = {TileFlags.Passage}
+    flags_template = FlagSet(TileFlags.Passage)
     drawn_surface = imglib.load_image_from_file("images/dd/env/DoorOnWall.png", after_scale=tile_size_t)
 
 # ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
@@ -81,7 +95,7 @@ class HiddenRoomTile(BaseTile):
     needs_update = False
     passable = True
     transparent = False
-    flags = {TileFlags.PartOfHiddenRoom}
+    flags_template = FlagSet(TileFlags.PartOfHiddenRoom)
     drawn_surface = imglib.load_image_from_file("images/dd/env/Wall.png", after_scale=tile_size_t)
     uncovered_drawn_surface = pygame.Surface(tile_size_t)
     uncovered_drawn_surface.fill(Color.Black)
@@ -103,9 +117,9 @@ class HiddenRoomDoorTile(HiddenRoomTile):
 # ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 
 class BaseSpawnerTile(EmptyTile):
-    flags = {TileFlags.EnemySpawner}
     needs_update = True
     spawned_enemy = None
+    flags_template = FlagSet(TileFlags.EnemySpawner)
     def __init__(self, level, col_idx, row_idx):
         super().__init__(level, col_idx, row_idx)
         self.spawned = False
@@ -119,6 +133,45 @@ class BaseSpawnerTile(EmptyTile):
 class GrayGooSpawner(BaseSpawnerTile):
     spawned_enemy = enemies.GrayGoo
 
+
+# ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+# ===== ===== =====        Containers       ===== ===== =====
+# ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+
+class BaseContainer(BaseTile):
+    needs_update = False
+    passable = True
+    flags_template = FlagSet(TileFlags.Container)
+    # Don't change this
+    inventory_slots = 8
+    def __init__(self, level, col_idx, row_idx, *, inventory_contents=[]):
+        super().__init__(self, level, col_idx, row_idx)
+        self.inventory = BaseInventory()
+        # inventory_contents should be a list of item classes.
+        # They are initialized when taken from the inventory
+        # by a player.
+        for item in inventory_contents:
+            self.inventory.add_item(item)
+
+    def take_item(self, arg, player):
+        # if the item is not yet initialized (never taken by a player)
+        if arg not in self.inventory.slots:
+            return None
+        if isinstance(arg, type):
+            item_constructor = arg
+            self.inventory.remove_item(item_constructor)
+            return item_constructor(player)
+        else:
+            item = arg
+            self.inventory.remove_item(item)
+            return item
+
+    def place_item(self, item):
+        return self.inventory.add_item(item)
+
+# ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+# ===== ===== =====          Parser         ===== ===== =====
+# ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 parse_dict = {
     ".": EmptyTile,
     "W": WallTile,
@@ -128,7 +181,8 @@ parse_dict = {
     "g": GrayGooSpawner
 }
 
-passage_chars = [k for k, v in parse_dict.items() if TileFlags.Passage in v.flags]
+# We use flags_template since these are classes
+passage_chars = [k for k, v in parse_dict.items() if v.flags_template.Passage]
 
 def parse_layout(raw, level_obj):
     result = [[(parse_dict[char] if char in parse_dict else MissingTile)(level_obj, cidx, ridx)

@@ -4,7 +4,7 @@ import json_ext as json
 
 print("Load abstract base class of level tile")
 
-config = json.load(open("configs/dungeon.json", "r"))
+config = json.loadf("configs/dungeon.json")
 level_size = config["level_size"]
 tile_size = config["tile_size"]
 tile_size_t = (tile_size, tile_size)

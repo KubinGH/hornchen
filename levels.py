@@ -1,5 +1,5 @@
 import abc
-import os
+from os import listdir
 import re
 import copy
 
@@ -10,6 +10,12 @@ import json_ext as json
 from abc_level import AbstractLevel
 import leveltiles
 from colors import Color
+import zipopen
+
+if zipopen.enable_resource_zip:
+    open = zipopen.open
+    listdir = zipopen.listdir
+
 
 print("Load levels")
 
@@ -19,7 +25,7 @@ START_LEVEL_FILENAME = "start.txt"
 FALLBACK_LEVEL_FILENAME = "empty.txt"
 NONGENERIC_FLAG = "::nongeneric::"
 
-config = json.load(open("configs/dungeon.json", "r"))
+config = json.loadf("configs/dungeon.json")
 level_surface_size = config["level_surface_size"]
 tile_size = config["tile_size"]
 tile_size_t = (tile_size, tile_size)
@@ -41,15 +47,15 @@ default_start_entries = {"left": None, "right":  None,
 entryany_pattern = re.compile("any=\((\d+), (\d+)\)")
 bgname_pattern = re.compile("bg=\"(.+?)\"")
 def load_level_data_from_file(filename, is_special=False):
-    with open(filename, "r") as file:
-        lines = file.read().strip().split("\n")
+    with open(filename) as file:
+        lines = [line.strip() for line in file.read().strip().split("\n")]
     nongeneric_flag_present = lines[0] == NONGENERIC_FLAG
     # We either want both the flag to be present and the level to be non generic,
     # or no flag and generic level, so we use XNOR (true for 00 and 11).
     if logic_xnor(nongeneric_flag_present, is_special):
         if nongeneric_flag_present: lines.pop(0)
     else:
-        raise AssertionError("Level from file {} was expected to have non generic flag.")
+        raise AssertionError("Level from file {} was expected to have non generic flag.".format(filename))
     entries = default_start_entries.copy()
     matchlast = bgname_pattern.match(lines[-1])
     if matchlast is not None:
@@ -86,7 +92,11 @@ class BaseLevel(AbstractLevel, metaclass=abc.ABCMeta):
         self.force_full_update = True
         self.force_render_update = True
         self.transparency_map = self.create_transparency_map() # passability for collisions
-        self.precache = {} # used if you want to save something into the cache before level deletion
+        # used if you want to save something into the cache before level deletion
+        self.precache = {
+            "sprites": [],
+            "uncovered": []
+        }
         # This is should be set by the state that handles this level, and has a 'player' attribute
         self.parent = None
 
@@ -106,14 +116,12 @@ class BaseLevel(AbstractLevel, metaclass=abc.ABCMeta):
         return len(self.layout)
 
     def create_cache(self):
-        cache = {}
+        cache = self.precache
         cache.update(self.precache)
-        cache["sprites"] = [sprite.create_cache() for sprite in self.sprites]
-        cache["uncovered"] = []
+        cache["sprites"].extend(sprite.create_cache() for sprite in self.sprites)
         for row, tilerow in enumerate(self.layout):
             for col, tile in enumerate(tilerow):
-                if leveltiles.TileFlags.PartOfHiddenRoom in tile.flags and \
-                        tile.uncovered:
+                if tile.flags.PartOfHiddenRoom and tile.uncovered:
                     cache["uncovered"].append((col, row))
         return cache
 
@@ -121,14 +129,17 @@ class BaseLevel(AbstractLevel, metaclass=abc.ABCMeta):
     def load_from_cache(cls, cache):
         obj = cls()
         for sprite_cache in cache["sprites"]:
-            col, row = sprite_cache["levelpos"]
-            spawner_tile = obj.layout[row][col]
-            sprite = sprite_cache["cls"].from_cache(obj, spawner_tile, sprite_cache)
-            spawner_tile.spawned = True
-            obj.sprites.append(sprite)
-        for col, row in cache["uncovered"]:
+            if sprite_cache["alive"]:
+                col, row = sprite_cache["levelpos"]
+                spawner_tile = obj.layout[row][col]
+                sprite = sprite_cache["cls"].from_cache(obj, spawner_tile, sprite_cache)
+                spawner_tile.spawned = True
+                obj.sprites.append(sprite)
+            else:
+                col, row = sprite_cache["levelpos"]
+                obj.layout[row][col].spawned = True                
             tile = obj.layout[row][col]
-            if leveltiles.TileFlags.PartOfHiddenRoom in tile.flags:
+            if tile.flags.PartOfHiddenRoom:
                 tile.uncover()
         return obj
 
@@ -158,8 +169,9 @@ class BaseLevel(AbstractLevel, metaclass=abc.ABCMeta):
             for tile in row:
                 if tile.needs_update:
                     tile.update()
-        for sprite in self.sprites:
-            sprite.update(self.parent.player)
+        # The sprites may decide to remove themselves, so we need a copy
+        for sprite in self.sprites[:]:
+            sprite.update()
 
     def handle_events(self, events, pressed_keys, mouse_pos):
         pass
@@ -204,7 +216,7 @@ StartLevel = level_creator("levels/" + START_LEVEL_FILENAME, True)
 EmptyLevel = level_creator("levels/" + FALLBACK_LEVEL_FILENAME, True)
 
 print("Loading generic levels: ", end="")
-for file in sorted(os.listdir("levels")):
+for file in sorted(listdir("levels")):
     if not file.endswith(".txt"): continue
     try:
         level = level_creator("levels/{}".format(file))

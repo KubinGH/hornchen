@@ -3,6 +3,13 @@ import warnings, inspect # For outdated/unoptimal functions
 import pygame
 from colors import Color
 from animation import Animation
+import zipopen
+
+image_load = pygame.image.load # Needed for zip hook
+
+if zipopen.enable_resource_zip:
+    def image_load(filename):
+        return pygame.image.load(zipopen.open(filename, "rb"))
 
 print("Load image library")
 
@@ -53,7 +60,8 @@ def load_image_from_file(filename, ignore_missing=True, *, after_scale=None):
     if filename not in loaded_images:
         log("Load image:", filename)
         try:
-            this = pygame.image.load(filename).convert_alpha()
+            this = image_load(filename)
+            this = this.convert_alpha()
         except pygame.error:
             if ignore_missing:
                 this = get_missing_surface()

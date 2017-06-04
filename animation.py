@@ -28,5 +28,5 @@ class Animation:
     def from_surface_h(source, frame_height, tick):
         width, height = source.get_size()
         frames = [source.subsurface(0, y, width, frame_height)
-                  for x in range(0, height, frame_height)]
+                  for y in range(0, height, frame_height)]
         return Animation(frames, tick)

@@ -50,6 +50,7 @@ class PlayerCharacter(BaseSprite):
         self.move_sprint = False
         self.rotation = "right"
         self.going_through_door = False
+        self.crouching = False
 
         self.fov_enabled = self.game.vars["enable_fov"]
         if self.fov_enabled:
@@ -75,6 +76,7 @@ class PlayerCharacter(BaseSprite):
         self.moving["up"]    = pressed_keys[pygame.K_UP]
         self.moving["down"]  = pressed_keys[pygame.K_DOWN]
         self.move_sprint     = pressed_keys[pygame.K_s]
+        self.crouching       = pressed_keys[pygame.K_c]
         for event in events:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
@@ -96,12 +98,12 @@ class PlayerCharacter(BaseSprite):
     def update(self):
         self.inventory.update()
         self.item_box.update()
-        self.handle_moving()
+        if not self.crouching:
+            self.handle_moving()
         self.near_passage = None
         pcol, prow = self.closest_tile_index        
         # Near passages to other levels
-        if self.activate_tile:
-            self.going_through_door = True
+        self.going_through_door = False
         for col, row in self.get_tiles_next_to():
             tile = self.level.layout[row][col]
             if tile.flags.Passage:
@@ -111,8 +113,8 @@ class PlayerCharacter(BaseSprite):
             tile = self.level.layout[prow][pcol]
             if tile.flags.Passage:
                 self.near_passage = tile
-        if self.near_passage is None: 
-            self.going_through_door = False
+        if self.near_passage is not None and self.activate_tile:
+            self.going_through_door = True
         # Near containers (chests)
         self.near_container = None
         for col, row in self.get_tiles_next_to():

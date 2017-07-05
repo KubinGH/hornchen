@@ -21,7 +21,6 @@ class AbstractLevelTile(metaclass=abc.ABCMeta):
         self.col_idx, self.row_idx = col_idx, row_idx
         self.rect = pygame.Rect((self.col_idx * tile_size, self.row_idx * tile_size), tile_size_t)
 
-    @abc.abstractmethod
     def update(self):
         """
         Update this tile. Called every tick.
@@ -39,3 +38,6 @@ class AbstractLevelTile(metaclass=abc.ABCMeta):
     @property
     def index(self):
         return self.col_idx, self.row_idx
+
+    def load_cache(self, cache):
+        pass

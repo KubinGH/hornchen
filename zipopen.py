@@ -2,7 +2,7 @@ import io
 import zipfile
 from os import listdir
 
-enable_resource_zip = False
+enable_resource_zip = True
 
 archive = None
 c_open = open

@@ -22,9 +22,9 @@ class FlagSet:
     def __init__(self, *flags):
         self.flagset = set(flags)
         self.nameset = set(flag.name for flag in flags)
-
-    def __getattr__(self, name):
-        return name in self.nameset
+        # Attribute-based access
+        for name in TileFlags.__members__:
+            setattr(self, name, name in self.nameset)
 
     def copy(self):
         return FlagSet(*self.flagset)
@@ -46,9 +46,6 @@ class BaseTile(AbstractLevelTile):
     def __init__(self, level, col_idx, row_idx):
         super().__init__(level, col_idx, row_idx)
         self.flags = self.flags_template.copy()
-
-    def update(self):
-        pass
 
     @property
     def surface(self):
@@ -129,6 +126,16 @@ class BaseSpawnerTile(EmptyTile):
             self.spawn = self.spawned_enemy(self.level, self)
             self.level.sprites.append(self.spawn)
             self.spawned = True
+            self.level.precache["tiles"].append({
+                "col": self.col_idx,
+                "row": self.row_idx,
+                "spawned": True,
+            })
+
+    def load_cache(self, cache):
+        self.spawned = cache["spawned"]
+        # Retain the cache
+        self.level.precache["tiles"].append(cache)
 
 class GrayGooSpawner(BaseSpawnerTile):
     spawned_enemy = enemies.GrayGoo

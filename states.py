@@ -197,7 +197,7 @@ class DungeonState(AbstractGameState):
     tile_size = config["tile_size"]
     pos_fix = config["level_surface_position"]
     config_ui = json.loadf("configs/playerui.json")
-    def __init__(self, game, *, level, entry_dir="any", player=None, run_interlude=False):
+    def __init__(self, game, *, level, entry_dir="any", player=None):
         super().__init__(game)
 
         self.level = level
@@ -223,6 +223,20 @@ class DungeonState(AbstractGameState):
 
         self.player.on_new_level()
         self.level.update()
+
+        pygame.mouse.set_visible(False)
+
+    def pause(self):
+        super().pause()
+        pygame.mouse.set_visible(True)
+
+    def resume(self):
+        super().resume()
+        pygame.mouse.set_visible(False)
+
+    def cleanup(self):
+        super().cleanup()
+        pygame.mouse.set_visible(True)
 
     def handle_events(self, events, pressed_keys, mouse_pos):
         for event in events:
@@ -287,7 +301,7 @@ class DungeonState(AbstractGameState):
         else:
             newlevelobj = newlevel()
         new_state = DungeonState(self.game, level=newlevelobj, entry_dir=entry_dir, 
-                                 player=self.player, run_interlude=True)
+                                 player=self.player)
         if use_interlude:
             # Draw a frame of the game in each state (those are on different levels),
             # then save some of the UI elements (border, topbar) - static_elems,
@@ -335,8 +349,8 @@ class InterludeState(AbstractGameState):
         self.drawers = drawers
         self.fix = fix
 
-        # Here the program merges the two surfaces and then
-        # handles the way it will scroll.
+        # Merge the two surfaces and then
+        # handle the way it scrolls
         assert self.way in ("left", "right", "up", "down")
         first_w, first_h = self.first.get_size()
         second_w, second_h = self.second.get_size()
@@ -421,6 +435,8 @@ class PlayerInventoryState(AbstractGameState):
     slots_gap = config["slots_gap"]
     slot_border_width = config["slot_border_width"]
     slot_cols, slot_rows = config["slot_cols"], config["slot_rows"]
+    icon_size = slot_size - (2 * slot_border_width)
+    icon_size_t = (icon_size, icon_size)
     lazy_state = True
     def __init__(self, game, *, parent_surface=None):
         super().__init__(game)
@@ -504,7 +520,7 @@ class PlayerInventoryState(AbstractGameState):
         screen.blit(self.selected_slot_img, self.slot_positions[self.selected[0] + self.selected[1] * self.slot_cols])
         for pos, item in zip(self.item_icon_positions, self.inventory.slots):
             if item is not None and hasattr(item, "icon"):
-                screen.blit(item.icon, pos)
+                screen.blit(imglib.scale(item.icon, self.icon_size_t), pos)
 
 
 # ===== ===== ===== ===== ===== ===== ===== ===== ===== =====

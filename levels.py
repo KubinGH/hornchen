@@ -95,7 +95,8 @@ class BaseLevel(AbstractLevel, metaclass=abc.ABCMeta):
         # used if you want to save something into the cache before level deletion
         self.precache = {
             "sprites": [],
-            "uncovered": []
+            "uncovered": [],
+            "tiles": []
         }
         # This is should be set by the state that handles this level, and has a 'player' attribute
         self.parent = None
@@ -117,7 +118,6 @@ class BaseLevel(AbstractLevel, metaclass=abc.ABCMeta):
 
     def create_cache(self):
         cache = self.precache
-        cache.update(self.precache)
         cache["sprites"].extend(sprite.create_cache() for sprite in self.sprites)
         for row, tilerow in enumerate(self.layout):
             for col, tile in enumerate(tilerow):
@@ -129,18 +129,18 @@ class BaseLevel(AbstractLevel, metaclass=abc.ABCMeta):
     def load_from_cache(cls, cache):
         obj = cls()
         for sprite_cache in cache["sprites"]:
-            if sprite_cache["alive"]:
-                col, row = sprite_cache["levelpos"]
-                spawner_tile = obj.layout[row][col]
-                sprite = sprite_cache["cls"].from_cache(obj, spawner_tile, sprite_cache)
-                spawner_tile.spawned = True
-                obj.sprites.append(sprite)
-            else:
-                col, row = sprite_cache["levelpos"]
-                obj.layout[row][col].spawned = True                
+            scol, srow = sprite_cache["levelpos"][0], sprite_cache["levelpos"][1]
+            spawner_tile = obj.layout[srow][scol]
+            sprite = sprite_cache["cls"].from_cache(obj, spawner_tile, sprite_cache)
+            obj.sprites.append(sprite)
+        for col, row in cache["uncovered"]:
             tile = obj.layout[row][col]
             if tile.flags.PartOfHiddenRoom:
                 tile.uncover()
+        for tile_cache in cache["tiles"]:
+            col, row = tile_cache["col"], tile_cache["row"]
+            tile = obj.layout[row][col]
+            tile.load_cache(tile_cache)
         return obj
 
     def stop(self):

@@ -17,7 +17,7 @@ inventory_gui_config = json.loadf("configs/player_inventory.json")
 slot_size_t = inventory_gui_config["slot_size"]
 slot_border_width = inventory_gui_config["slot_border_width"]
 slot_size = slot_size_t[0]
-icon_size = slot_size - 2 * slot_border_width
+icon_size = 16
 icon_size_t = (icon_size, icon_size)
 
 dungeon_config = json.loadf("configs/dungeon.json")
@@ -154,6 +154,8 @@ class EnchantedSword(Sword):
             self.cooldown = round(self.ticks_left * 1.1)
             if self.projectile_rect is None:
                 self.spawn_projectile(self.rect)
+        if self.player.activate_tile:
+            self.remove_projectile()
 
     def update(self):
         super().update()

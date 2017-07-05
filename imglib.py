@@ -36,16 +36,37 @@ def get_missing_surface(size=(100, 100)):
     surface.fill(Color.Black, pygame.Rect(half[0], half[1], half[0], half[1]))
     return surface
 
+def simple_scale(surface, dwidth, dheight):
+    source = pygame.PixelArray(surface)
+    width, height = size = source.shape
+    newsize = (width * dwidth, height * dheight)
+    array = pygame.PixelArray(pygame.Surface(newsize).convert_alpha())
+    for x in range(width):
+        for y in range(height):
+            value = source[x, y]
+            ax, ay = x * dwidth, y * dheight
+            array[ax:ax+dwidth, ay:ay+dheight] = value
+    result = array.surface
+    del source, array
+    return result
 
 scale_cache = {}
-def scale(surface, size):
+def scale(surface, size, smooth=False):
     size = tuple(size)
     params = (surface, size)
     if params not in scale_cache:
-        log("Scale image:", params)
         surface_size = surface.get_size()
-        if size[0] // 2 == surface_size[0] and size[1] // 2 == surface_size[1]:
+        dw, dh = size[0] / surface_size[0], size[1] / surface_size[1]
+        if dw == dh == 1:
+            return surface
+        else:
+            log("Scale image:", params)
+        if not smooth and (dw % 1 == dh % 1 == 0):
+            scale_cache[params] = simple_scale(surface, int(dw), int(dh))
+        elif dw == dh == 2:
             scale_cache[params] = pygame.transform.scale2x(surface)
+        elif dw == dh and dw % 1 == 0 and (int(dw) & (int(dw) - 1)) == 0: # scale is a power of 2
+            scale_cache[params] = scale(pygame.transform.scale2x(surface), size)
         else:
             scale_cache[params] = pygame.transform.scale(surface, size)
     return scale_cache[params]

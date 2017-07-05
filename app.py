@@ -23,7 +23,6 @@ screen = pygame.display.set_mode(WINDOW_SIZE, flags)
 
 import game
 import fontutils
-from dirtyrects import DirtyRectsHandler, DummyRectsHandler
 from colors import Color
 import gameconsole
 # These are imported to be used by the console
@@ -64,7 +63,6 @@ class App:
         self.use_dirty_rects = use_dirty_rects
 
     def run(self, fullscreen=fullscreen):
-        recthandler = DirtyRectsHandler() if self.use_dirty_rects else DummyRectsHandler()
         player = self.game.player
         last_state = current_state = None
         show_fps = False; fpsfont = fontutils.get_sysfont("Monospace", 32); force_show_fps = False
@@ -88,10 +86,7 @@ class App:
         def get_sprite_by_class(cls):
             return get_sprites_by_class(cls)[0]
         def give(arg):
-            if isinstance(arg, str):
-                cls = getattr(playeritems, arg)
-            else:
-                cls = arg
+            cls = getattr(playeritems, arg) if isinstance(arg, str) else arg
             return player.inventory.add_item(cls(player))
         console_functions = [spawn_enemy, get_sprite_by_class]
         self.console_namespace_additions.update({func.__name__: func for func in console_functions})
@@ -157,34 +152,23 @@ class App:
 
             self.screen.fill(Color.Black)
 
-            gamerects = self.game.draw(current_state, self.screen)
-            recthandler.add_iter(gamerects)
+            self.game.draw(current_state, self.screen)
 
             if console_enabled:
                 if constatus is self.console.Status.Interpret:
                     namespace = locals()
                     namespace.update(self.console_namespace_additions)
                     self.console.interpret_current(namespace)
-                console_rect = self.console.draw(self.screen)
-                if console_rect is not None:
-                    recthandler.add(console_rect)
+                self.console.draw(self.screen)
             if show_fps:
                 if not ticks % 120 or force_show_fps:
                     current_fps = round(clock.get_fps())
                     render = fontutils.get_text_render(fpsfont, str(current_fps), False, Color.Red, dolog=False)
                 fps_rect = render.get_rect()
                 fps_rect.x = self.screen.get_width() - render.get_width()
-                recthandler.add(fps_rect)
                 self.screen.blit(render, fps_rect)
 
-            recthandler.force_full_update()
-
-            if self.use_dirty_rects and recthandler.rect_count < 100:
-                rects = recthandler.get()
-                if rects is not None: rects = list(rects)
-                pygame.display.update(rects)
-            else:
-                pygame.display.flip()
+            pygame.display.flip()
 
             if current_state is not None and current_state.lazy_state:
                 max_fps = 60
@@ -206,5 +190,5 @@ if __name__ == "__main__":
     profiler.dump_stats("profile.stats")
     stats = pstats.Stats("profile.stats")
     stats.strip_dirs(); stats.sort_stats("ncalls")
-    stats.print_stats()
+    #stats.print_stats()
 

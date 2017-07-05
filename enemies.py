@@ -32,13 +32,12 @@ class BaseEnemy(BaseSprite):
 
     def update(self):
         player = self.level.parent.player
-        if self.health_points <= 0:
-            self.level.sprites.remove(self)
-            self.level.precache["sprites"].append(self.create_cache())
-
         if self.damage_on_player_touch and player is not None:
             if self.rect.colliderect(player.rect):
                 player.take_damage(self.damage)
+
+        if self.health_points <= 0:
+            self.level.sprites.remove(self)
 
     def draw(self, screen, pos_fix=(0, 0)):
         enable_hp_bar = self.level.parent.game.vars["enable_enemy_hp_bars"]
@@ -76,8 +75,7 @@ class BaseEnemy(BaseSprite):
             "cls": type(self),
             "rect": self.rect,
             "levelpos": (self.spawner_tile.col_idx, self.spawner_tile.row_idx),
-            "health_points": self.health_points,
-            "alive": self.dead
+            "health_points": self.health_points
         }
 
     @classmethod

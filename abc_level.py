@@ -70,3 +70,18 @@ class AbstractLevel(metaclass=abc.ABCMeta):
         was drawn, unless the level was changed - then the
         surface will filled black.
         """
+
+    def get_sprites_if(self, predicate):
+        return [sprite for sprite in self.sprites if predicate(sprite)]
+
+    @property
+    def hostile_sprites(self):
+        return self.get_sprites_if(lambda sprite: sprite.hostile)
+
+    @property
+    def friendly_sprites(self):
+        return self.get_sprites_if(lambda sprite: sprite.friendly)
+
+    @property
+    def passive_sprites(self):
+        return self.get_sprites_if(lambda sprite: sprite.hostile is sprite.friendly is False)

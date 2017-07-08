@@ -83,7 +83,7 @@ def load_level_data_from_file(filename, is_special=False):
 # ===== ===== =====        Base Level       ===== ===== =====
 # ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 
-class BaseLevel(AbstractLevel, metaclass=abc.ABCMeta):
+class BaseLevel(AbstractLevel):
     start_entries = default_start_entries
     def __init__(self):
         super().__init__()
@@ -129,10 +129,13 @@ class BaseLevel(AbstractLevel, metaclass=abc.ABCMeta):
     def load_from_cache(cls, cache):
         obj = cls()
         for sprite_cache in cache["sprites"]:
-            scol, srow = sprite_cache["levelpos"][0], sprite_cache["levelpos"][1]
-            spawner_tile = obj.layout[srow][scol]
-            sprite = sprite_cache["cls"].from_cache(obj, spawner_tile, sprite_cache)
-            obj.sprites.append(sprite)
+            if sprite_cache["type"] == "enemy":
+                scol, srow = sprite_cache["levelpos"][0], sprite_cache["levelpos"][1]
+                spawner_tile = obj.layout[srow][scol]
+                sprite = sprite_cache["cls"].from_cache(obj, spawner_tile, sprite_cache)
+                obj.sprites.append(sprite)
+            elif sprite_cache["type"] == "item":
+                obj.sprites.append(sprite_cache["cls"].from_cache(obj, sprite_cache))
         for col, row in cache["uncovered"]:
             tile = obj.layout[row][col]
             if tile.flags.PartOfHiddenRoom:
@@ -140,6 +143,9 @@ class BaseLevel(AbstractLevel, metaclass=abc.ABCMeta):
         for tile_cache in cache["tiles"]:
             col, row = tile_cache["col"], tile_cache["row"]
             tile = obj.layout[row][col]
+            # Because the layout is already created,
+            # the tiles are mutated in order to load the cache.
+            # (As opposed to creating a new instance from the cache)
             tile.load_cache(tile_cache)
         return obj
 

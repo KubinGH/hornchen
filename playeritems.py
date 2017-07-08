@@ -4,7 +4,42 @@ import pygame
 
 import json_ext as json
 import imglib
+from basesprite import BaseSprite
 from abc_playeritem import AbstractPlayerItem
+
+
+class DroppedItem(BaseSprite):
+    friendly = hostile = False # Passive
+    def __init__(self, level, rectcenter, item_cls):
+        super().__init__()
+        self.level = level
+        self.item_cls = item_cls
+        self.rect = pygame.Rect((0, 0), item_cls.dropped_size)
+        self.rect.center = rectcenter
+        self.surface = imglib.scale(item_cls.icon, self.rect.size)
+
+    def __repr__(self):
+        return "<{} @ {}>".format(type(self).__name__, self.rect.topleft)
+
+    def update(self):
+        player = self.level.parent.player
+        if self.rect.colliderect(player.rect):
+            if player.inventory.first_empty != -1:
+                player.inventory.add_item(self.item_cls(player))
+                self.level.sprites.remove(self)
+
+    def create_cache(self):
+        return {
+            "type": "item",
+            "cls": type(self),
+            "rect": self.rect,
+            "item_cls": self.item_cls
+        }
+
+    @classmethod
+    def from_cache(cls, level, cache):
+        return cls(level, cache["rect"].center, cache["item_cls"])
+
 
 class ValueRotationDependent:
     def __init__(self, right, left, up, down):
@@ -63,7 +98,9 @@ class BaseEdibleItem(AbstractPlayerItem):
     def rect(self):
         return pygame.Rect((self.player.rect.centerx - self.size[0] / 2, self.player.rect.bottom - 20), self.size)
 
-# ====== ====== ======
+# ====== Weapons ======
+
+# ==== Swords ====
 
 class Sword(AbstractPlayerItem):
     icon = imglib.load_image_from_file("images/sl/items/icons/sword_i.png", after_scale=icon_size_t)
@@ -95,7 +132,7 @@ class Sword(AbstractPlayerItem):
         if self.drawn:
             level = self.player.level
             if level is not None:
-                for sprite in level.sprites:
+                for sprite in level.hostile_sprites:
                     if self.rect.colliderect(sprite.rect) and sprite not in self.hit:
                         sprite.take_damage(self.damage_dealt)
                         self.hit.append(sprite)
@@ -177,7 +214,7 @@ class EnchantedSword(Sword):
                     continue
                 break
             if self.projectile_rect is not None:
-                for sprite in self.player.level.sprites:
+                for sprite in self.player.level.hostile_sprites:
                     if sprite.hostile and self.projectile_rect.colliderect(sprite.rect):
                         sprite.take_damage(self.damage_dealt / 2)
                         self.remove_projectile()
@@ -199,8 +236,18 @@ class EnchantedSword(Sword):
         if self.projectile_rect is not None:
             screen.blit(self.projectile_img, self.projectile_rect.move(pos_fix))
 
+# ====== Edible ======
+
 class Apple(BaseEdibleItem):
-    icon = imglib.load_image_from_file("images/sl/items/apple.png", after_scale=icon_size_t)
+    _dir = "images/sl/items/apple.png"
+    icon = imglib.load_image_from_file(_dir, after_scale=icon_size_t)
     size = (16, 16)
-    surface = imglib.load_image_from_file("images/sl/items/apple.png", after_scale=size)
+    surface = imglib.load_image_from_file(_dir, after_scale=size)
     points_healed = 1
+
+class HealthPotion(BaseEdibleItem):
+    _dir = "images/dd/pickups/HealthPotion.png"
+    icon = imglib.load_image_from_file(_dir, after_scale=icon_size_t)
+    size = (16, 16)
+    surface = imglib.load_image_from_file(_dir, after_scale=size)
+    points_healed = 4

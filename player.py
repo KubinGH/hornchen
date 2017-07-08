@@ -28,12 +28,16 @@ minimap_tiles = config_ui["minimap_tiles"]
 
 class PlayerCharacter(BaseSprite):
     size = (32, 32)
+    attributes = ["move_speed", "max_health_points", "vision_radius"]
     base_max_health_points = 3
-    invincibility_ticks_on_damage = 120
     base_move_speed = 2
-    sprint_move_speed = 6
     base_vision_radius = 16
+
+    # Static
+    invincibility_ticks_on_damage = 120
+    sprint_move_speed_gain = 4
     def __init__(self, game, *, imgname="Base"):
+        super().__init__()
         self.game = game
         # Set somewhat implicitly by the state which handles the level
         self.level = None 
@@ -45,6 +49,7 @@ class PlayerCharacter(BaseSprite):
         self.inventory.add_item(playeritems.Sword(self))
         self.selected_item_idx = 0
 
+        self.reset_attributes()
         self.activate_tile = False
         self.moving = {"left": False, "right": False, "up": False, "down": False}
         self.move_sprint = False
@@ -68,6 +73,9 @@ class PlayerCharacter(BaseSprite):
         self.invincible_hearts_render = False
         self.hearts = playerui.HeartsWidget(self.game, self)
         self.item_box = playerui.SelectedItemBoxWidget(self.game, self)
+
+    def __repr__(self):
+        return "<{} @ {}>".format(type(self).__name__, self.rect.topleft)
 
     def handle_events(self, events, pressed_keys, mouse_pos):
         self.activate_tile = False
@@ -96,6 +104,9 @@ class PlayerCharacter(BaseSprite):
 
 
     def update(self):
+        self.reset_attributes()
+        if self.move_sprint:
+            self.move_speed += self.sprint_move_speed_gain
         self.inventory.update()
         self.item_box.update()
         if not self.crouching:
@@ -175,6 +186,13 @@ class PlayerCharacter(BaseSprite):
         return [[False for _ in range(self.game.vars["mapsize"][0])] 
                 for _ in range(self.game.vars["mapsize"][1])]
 
+    def reset_attributes(self):
+        #for attribute in self.attributes:
+        #    setattr(self, attribute, getattr("base_{}".format(attribute)))
+        self.move_speed = self.base_move_speed
+        self.max_health_points = self.base_max_health_points
+        self.vision_radius = self.base_vision_radius
+
     # Health
 
     def take_damage(self, value):
@@ -248,26 +266,6 @@ class PlayerCharacter(BaseSprite):
                         visited.add(tup)
                         queue.appendleft(tup)
         self.level.force_render_update = True
-
-    # ===== Hero attributes =====
-
-    attributes = ["move_speed", "max_health_points", "vision_radius"]
-
-    @property
-    def move_speed(self):
-        if self.move_sprint:
-            v = self.sprint_move_speed
-        else:
-            v = self.base_move_speed
-        return v if v < tile_size else tile_size
-
-    @property
-    def max_health_points(self):
-        return self.base_max_health_points
-
-    @property
-    def vision_radius(self):
-        return self.base_vision_radius
 
     # Status
     @property

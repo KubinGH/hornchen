@@ -480,17 +480,16 @@ class PlayerInventoryState(AbstractGameState):
                 xi, yi = x + self.slot_border_width, y + self.slot_border_width
                 self.item_icon_positions.append((xi, yi))
         self.selected_slot_img = imglib.load_image_from_file("images/sl/player_inv/selected_slot.png", after_scale=self.slot_size_t)
-
+        self.pointed_slot_img = imglib.load_image_from_file("images/sl/player_inv/pointed_slot.png", after_scale=self.slot_size_t)
+        self.swapping_slot_img = imglib.load_image_from_file("images/sl/player_inv/swapping_slot.png", after_scale=self.slot_size_t)
         if self.player.near_container is not None:
             self.container = self.player.near_container
             self.c_slot_positions = []
             self.c_item_icon_positions = []
 
-        self.selected = list(divmod(self.player.selected_item_idx, self.slot_cols))[::-1]
+        self.pointed = list(divmod(self.player.selected_item_idx, self.slot_cols))[::-1]
+        self.swapping_idx = None
         self.leaving = False
-
-    def cleanup(self):
-        self.player.selected_item_idx = self.selected[0] + self.selected[1] * self.slot_cols
 
     def handle_events(self, events, pressed_keys, mouse_pos):
         for event in events:
@@ -498,26 +497,38 @@ class PlayerInventoryState(AbstractGameState):
                 if event.key == pygame.K_ESCAPE or event.key == pygame.K_i:
                     self.leaving = True
                 elif event.key == pygame.K_LEFT:
-                    if self.selected[0] > 0:
-                        self.selected[0] -= 1
+                    if self.pointed[0] > 0:
+                        self.pointed[0] -= 1
                 elif event.key == pygame.K_RIGHT:
-                    if self.selected[0] < self.slot_cols - 1:
-                        self.selected[0] += 1
+                    if self.pointed[0] < self.slot_cols - 1:
+                        self.pointed[0] += 1
                 elif event.key == pygame.K_UP:
-                    if self.selected[1] > 0: 
-                        self.selected[1] -= 1
+                    if self.pointed[1] > 0: 
+                        self.pointed[1] -= 1
                 elif event.key == pygame.K_DOWN:
-                    if self.selected[1] < self.slot_rows - 1:
-                        self.selected[1] += 1
-
+                    if self.pointed[1] < self.slot_rows - 1:
+                        self.pointed[1] += 1
+                elif event.key == pygame.K_z:
+                    self.player.selected_item_idx = self.pointed[0] + self.pointed[1] * self.slot_cols  
+                elif event.key == pygame.K_x:
+                    if self.swapping_idx is None:
+                        self.swapping_idx = self.pointed[0] + self.pointed[1] * self.slot_cols
+                    else:
+                        s = self.player.inventory.slots
+                        second_swapping_idx = self.pointed[0] + self.pointed[1] * self.slot_cols
+                        s[self.swapping_idx], s[second_swapping_idx] = s[second_swapping_idx], s[self.swapping_idx]
+                        self.swapping_idx = None
     def update(self):
         if self.leaving:
             self.game.pop_state()
             self.cleanup()
 
     def draw(self, screen):
-        screen.blit(self.surface, TOPLEFT)
-        screen.blit(self.selected_slot_img, self.slot_positions[self.selected[0] + self.selected[1] * self.slot_cols])
+        screen.blit(self.surface, TOPLEFT)        
+        screen.blit(self.pointed_slot_img, self.slot_positions[self.pointed[0] + self.pointed[1] * self.slot_cols])
+        if self.swapping_idx is not None:
+            screen.blit(self.swapping_slot_img, self.slot_positions[self.swapping_idx])
+        screen.blit(self.selected_slot_img, self.slot_positions[self.player.selected_item_idx])
         for pos, item in zip(self.item_icon_positions, self.inventory.slots):
             if item is not None and hasattr(item, "icon"):
                 screen.blit(imglib.scale(item.icon, self.icon_size_t), pos)

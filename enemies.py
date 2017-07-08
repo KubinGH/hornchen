@@ -7,10 +7,14 @@ import json_ext as json
 from colors import Color
 from libraries import spriteutils
 from basesprite import BaseSprite
+import playeritems # Drops
 
 print("Load enemies")
 
 base_directions = ["left", "right", "up", "down"]
+
+def percent_chance(percent):
+    return random.randint(1, 100) <= percent
 
 class BaseEnemy(BaseSprite):
     hostile = True
@@ -20,6 +24,7 @@ class BaseEnemy(BaseSprite):
     damage_on_player_touch = False
     hp_bar_gap = 4
     hp_bar_size = (32, 2)
+    drops = {}
     def __init__(self, level, spawner_tile):
         super().__init__()
         self.level, self.spawner_tile = level, spawner_tile
@@ -37,7 +42,7 @@ class BaseEnemy(BaseSprite):
                 player.take_damage(self.damage)
 
         if self.health_points <= 0:
-            self.level.sprites.remove(self)
+            self.on_death()
 
     def draw(self, screen, pos_fix=(0, 0)):
         enable_hp_bar = self.level.parent.game.vars["enable_enemy_hp_bars"]
@@ -72,6 +77,7 @@ class BaseEnemy(BaseSprite):
 
     def create_cache(self):
         return {
+            "type": "enemy",
             "cls": type(self),
             "rect": self.rect,
             "levelpos": (self.spawner_tile.col_idx, self.spawner_tile.row_idx),
@@ -90,6 +96,10 @@ class BaseEnemy(BaseSprite):
         if self.health_points > self.max_health_points:
             self.health_points = self.max_health_points
 
+    def on_death(self):
+        self.level.sprites.remove(self)
+
+
     def heal(self, value):
         self.take_damage(-value)
 
@@ -104,6 +114,11 @@ class GrayGoo(BaseEnemy):
     damage_on_player_touch = True
     size = (30, 30)
     surface = imglib.load_image_from_file("images/dd/enemies/GrayGoo.png", after_scale=size)
+    drops = {
+        "any": {
+            6: playeritems.Sword
+        }
+    }
     def __init__(self, level, spawner_tile):
         super().__init__(level, spawner_tile)
         self.ticks_to_wait = 0

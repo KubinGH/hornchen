@@ -62,8 +62,8 @@ class GameConsole:
         pygame.K_SEMICOLON: pygame.K_COLON,
         pygame.K_QUOTE:     pygame.K_QUOTEDBL,
         pygame.K_MINUS:     pygame.K_UNDERSCORE,
-        pygame.K_LEFTBRACKET: 123,
-        pygame.K_RIGHTBRACKET: 125,
+        pygame.K_LEFTBRACKET: 123,  # left curly bracket
+        pygame.K_RIGHTBRACKET: 125, # right curly bracket
     }
     uppercase_fix = -32 # a (97) -> A (65) when shift is pressed
     linegap = 1

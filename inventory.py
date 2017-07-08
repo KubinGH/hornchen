@@ -1,7 +1,8 @@
 class BaseInventory:
     # Exceptionless: If inventory-manipulating operations fail,
     # no exceptions will be raised. Use return values to check
-    # if they did. Exceptions could crash the game if things went wrong.
+    # if they did.
+    # Value used to represent an empty slot in the inventory
     empty_slot = None
     # Inheriting classes need to set this to an integer
     slots_count = None
@@ -24,12 +25,16 @@ class BaseInventory:
     def full(self):
         return self.full_slots == self.slots
 
+    @property
+    def first_empty(self):
+        return self.slots.index(self.empty_slot) if not self.full else -1
+
     def add_item(self, item):
         if self.full: 
             return -1
-        first_empty = self.slots.index(self.empty_slot)
-        self.slots[first_empty] = item
-        return first_empty
+        idx = self.first_empty
+        self.slots[idx] = item
+        return idx
 
     def remove_item(self, sought_item):
         for i, item in enumerate(self.slots):

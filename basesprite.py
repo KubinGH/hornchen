@@ -1,7 +1,9 @@
+import uuid
+
 import pygame
 
 import json_ext as json
-from libraries import spriteutils
+import spriteutils
 
 print("Load base sprite")
 
@@ -22,8 +24,15 @@ def _clamp(number, minim, maxim):
 
 class BaseSprite:
     hostile = False
+    friendly = False
     # Used by spriteutils.get_tiles_next_to
     next_to_cache = {}
+    def __init__(self):
+        self._id = uuid.uuid4()
+
+    def __hash__(self):
+        return hash(self._id)
+
     def draw(self, screen, pos_fix=(0, 0)):
         screen.blit(self.surface, self.rect.move(pos_fix[0], pos_fix[1]))
         nearby = self.get_tiles_next_to() + [self.closest_tile_index]

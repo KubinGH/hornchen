@@ -71,24 +71,23 @@ class App:
         act_max_fps = max_fps
         console_enabled = False
         # Console functions
+        def get_level():
+            return current_state.level
         def spawn_enemy(cls, col, row, count=1):
+            lvl = get_level()
             for _ in range(count):
-                current_state.level.sprites.append(cls(current_state.level,
-                                                   current_state.level.layout[row][col]))
-        def _search_func(seq, cond_func):
-            search = [elem for elem in seq if cond_func(elem)]
-            if not search:
-                raise ValueError("Couldn't find")
-            else:
-                return search
+                lvl.sprites.append(cls(lvl, lvl.layout[row][col]))
+        def drop_item(item_cls, pos):
+            lvl = get_level()
+            lvl.sprites.append(playeritems.DroppedItem(lvl, pos, item_cls))
         def get_sprites_by_class(cls):
-            return _search_func(current_state.level.sprites, lambda sprite: type(sprite) is cls)
+            return get_level().get_sprites_if(lambda sprite: type(sprite) is cls)
         def get_sprite_by_class(cls):
             return get_sprites_by_class(cls)[0]
         def give(arg):
             cls = getattr(playeritems, arg) if isinstance(arg, str) else arg
             return player.inventory.add_item(cls(player))
-        console_functions = [spawn_enemy, get_sprite_by_class]
+        console_functions = [get_level, spawn_enemy, get_sprite_by_class]
         self.console_namespace_additions.update({func.__name__: func for func in console_functions})
 
         # Main loop
@@ -118,13 +117,17 @@ class App:
                             flags = NORMAL_FLAGS
                         pygame.display.set_mode(WINDOW_SIZE, flags)
                     elif shift_pressed(pressed_keys):
-                        if event.key == pygame.K_f:
-                            act_max_fps = next(max_fps_vals)
-                            print("Set max FPS to", act_max_fps)
-                        elif event.key == pygame.K_h:
-                            self.game.vars["enable_enemy_hp_bars"] = not self.game.vars["enable_enemy_hp_bars"]
-                        elif event.key == pygame.K_p:
-                            pause = not pause
+                        # These are valid characters, and the user may need them
+                        # otherwise e.g. shift+p=P may be muted and a pause may be created
+                        # instead
+                        if not console_enabled: 
+                            if event.key == pygame.K_f:
+                                act_max_fps = next(max_fps_vals)
+                                print("Set max FPS to", act_max_fps)
+                            elif event.key == pygame.K_h:
+                                self.game.vars["enable_enemy_hp_bars"] = not self.game.vars["enable_enemy_hp_bars"]
+                            elif event.key == pygame.K_p:
+                                pause = not pause
             if pause:
                 continue
             last_state = current_state

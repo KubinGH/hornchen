@@ -85,6 +85,7 @@ class MainMenuState(AbstractGameState):
         self.border_drawer.draw(screen, TOPLEFT)
 
     def start_game(self):
+        self.game.reset_game()
         gen = mazegen.MazeGenerator(*self.game.vars["mapsize"])
         gen.create2()
         self.game.vars["maze"] = gen.data

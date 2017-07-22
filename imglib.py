@@ -5,6 +5,7 @@ from colors import Color
 from animation import Animation
 import zipopen
 
+PIXEL_ARRAY_EXISTS = "PixelArray" in dir(pygame)
 image_load = pygame.image.load # Needed for zip hook
 
 if zipopen.enable_resource_zip:
@@ -62,7 +63,7 @@ def scale(surface, size, smooth=False):
             return surface
         else:
             log("Scale image:", params)
-        if not smooth and (dw % 1 == dh % 1 == 0):
+        if not smooth and (dw % 1 == dh % 1 == 0) and PIXEL_ARRAY_EXISTS:
             scale_cache[params] = simple_scale(surface, int(dw), int(dh))
         elif dw == dh == 2:
             scale_cache[params] = pygame.transform.scale2x(surface)

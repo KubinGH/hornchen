@@ -8,7 +8,6 @@ class AbstractGameState(metaclass=abc.ABCMeta):
     # overuse the CPU doing literally nothing
     lazy_state = False
     # only fill a part of the screen automatically, a rect
-    allowed_fill = pygame.Rect(0, 0, 0, 0)
     flags = set()
     @abc.abstractmethod
     def __init__(self, game):

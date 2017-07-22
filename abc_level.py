@@ -1,6 +1,45 @@
 import abc
+import time
 
 print("Load abstract base class of level")
+
+class SpriteContainer(list):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setchange()
+
+    def setchange(self):
+        self.last_changed = time.clock()
+
+    def append(self, *args, **kwargs):
+        super().append(*args, **kwargs)
+        self.setchange()
+
+    def clear(self, *args, **kwargs):
+        super().clear(*args, **kwargs)
+        self.setchange()
+
+    def extend(self, *args, **kwargs):
+        super().extend(*args, **kwargs)
+        self.setchange()
+
+    def insert(self, *args, **kwargs):
+        super().insert(*args, **kwargs)
+        self.setchange()
+
+    def pop(self, *args, **kwargs):
+        try:
+            super().pop(*args, **kwargs)
+            self.setchange()
+        except IndexError as e:
+            print("Unhandled IndexError in SpriteContainer: {}".format(str(e)))
+
+    def remove(self, *args, **kwargs):
+        try:
+            super().remove(*args, **kwargs)
+            self.setchange()
+        except ValueError as e:
+            print("Unhandled ValueError in SpriteContainer: {}".format(str(e)))
 
 class AbstractLevel(metaclass=abc.ABCMeta):
     @abc.abstractmethod
@@ -11,9 +50,12 @@ class AbstractLevel(metaclass=abc.ABCMeta):
         Note: the parent is meant to be set by the state
         that will handle this level, e.g. DungeonState.
         """
-        self.sprites = []
+        self.sprites = SpriteContainer()
         self.parent = None
         self.layout = self.get_layout_copy()
+        self._hostile_sprites = []; self._hcheck = self.sprites.last_changed
+        self._friendly_sprites = []; self._fcheck = self.sprites.last_changed
+        self._passive_sprites = []; self._pcheck = self.sprites.last_changed
 
     @abc.abstractmethod
     def get_layout_copy(self):
@@ -76,12 +118,22 @@ class AbstractLevel(metaclass=abc.ABCMeta):
 
     @property
     def hostile_sprites(self):
-        return self.get_sprites_if(lambda sprite: sprite.hostile)
+        if self.sprites.last_changed != self._hcheck:
+            self._hostile_sprites = [sprite for sprite in self.sprites if sprite.hostile]
+            self._hcheck = self.sprites.last_changed
+        return self._hostile_sprites
 
     @property
     def friendly_sprites(self):
-        return self.get_sprites_if(lambda sprite: sprite.friendly)
+        if self.sprites.last_changed != self._fcheck:
+            self._friendly_sprites = [sprite for sprite in self.sprites if sprite.friendly]
+            self._fcheck = self.sprites.last_changed
+        return self._friendly_sprites
 
     @property
     def passive_sprites(self):
-        return self.get_sprites_if(lambda sprite: sprite.hostile is sprite.friendly is False)
+        if self.sprites.last_changed != self._pcheck:
+            self._passive_sprites = [sprite for sprite in self.sprites 
+                                     if sprite.hostile is sprite.friendly is False]
+            self._pcheck = self.sprites.last_changed
+        return self._passive_sprites

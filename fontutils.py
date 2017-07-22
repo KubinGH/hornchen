@@ -1,6 +1,7 @@
-import pygame
 import warnings
 import zipopen
+import pygame
+from colors import Color
 
 load_font = pygame.font.Font
 
@@ -41,18 +42,14 @@ def get_sysfont(source, size, bold=False, italic=False):
 
 render_cache = {}
 def get_text_render(font, text, antialias, color, background=None, dolog=True):
-    if isinstance(color, pygame.Color):
-        color = color_as_tuple(color)
     params = (font, text, antialias, color, background)
     if params not in render_cache:
         if dolog: log("Text render: {}".format(params))
-        render_cache[params] = font.render(text, antialias, color, background)
+        render_cache[params] = font.render(text, antialias, color, background).convert_alpha()
     return render_cache[params]
 
 multiline_render_cache = {}
 def get_multiline_text_render(font, text, antialias, color, background=None, linegap=2, dolog=False):
-    if isinstance(color, pygame.Color):
-        color = color_as_tuple(color)
     params = (font, text, antialias, color, background, linegap)
     if params not in multiline_render_cache:
         lines_render = [get_text_render(font, line, antialias, color, background, dolog)
@@ -61,6 +58,9 @@ def get_multiline_text_render(font, text, antialias, color, background=None, lin
         height = sum(surface.get_height() for surface in lines_render) + \
                     (linegap * (len(lines_render) - 1))
         surface = pygame.Surface((width, height))
+        colorkey = Color.Black if color is not Color.Black else (0, 0, 1)
+        surface.fill(colorkey)
+        surface.set_colorkey(colorkey)
         current_height = 0
         for render in lines_render:
             surface.blit(render, (0, current_height))

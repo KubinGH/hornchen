@@ -23,8 +23,13 @@ class GameEngine:
         self.vars.update(kwargs)
         self.state_stack = []
         self.ticks = 0
-        self.player = PlayerCharacter(self)
+        self.player = None
+        self.reset_game()
         self.push_state_t(MainMenuState)
+
+    def reset_game(self):
+        self.player = PlayerCharacter(self)
+        self.vars["level_caches"].clear()
 
     @property
     def top_state(self):

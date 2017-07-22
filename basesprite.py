@@ -66,7 +66,8 @@ class BaseSprite:
         # function calls reduce speed
         col = 0 if col < 0 else col; col = level_size[0] if col > level_size[0] else col
         row = 0 if row < 0 else row; row = level_size[1] if row > level_size[1] else row
-        return col, row
+        # Note: pygame_sdl2 uses float for rect.centerx, so we need a cast
+        return int(col), int(row) 
 
     def get_tiles_next_to(self):
         return [(col, row) for col, row in spriteutils.get_tiles_next_to(self) 
@@ -84,9 +85,9 @@ class BaseSprite:
         return False
 
     def simple_deal_damage(self, once=True):
-        for sprite in self.level.sprites:
-            if ((self.friendly and sprite.hostile) or (self.hostile and sprite.friendly)) and \
-               self.rect.colliderect(sprite.rect):
+        it = self.level.hostile_sprites if self.friendly else self.level.friendly_sprites if self.hostile else []
+        for sprite in it:
+            if self.rect.colliderect(sprite.rect):
                 sprite.take_damage(self.damage)
                 if once:
                     return True

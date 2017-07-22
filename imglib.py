@@ -47,6 +47,7 @@ def simple_scale(surface, dwidth, dheight):
             ax, ay = x * dwidth, y * dheight
             array[ax:ax+dwidth, ay:ay+dheight] = value
     result = array.surface
+    # Release the surfaces
     del source, array
     return result
 
@@ -77,7 +78,7 @@ def scale2x(surface):
 
 
 loaded_images = {}
-def load_image_from_file(filename, ignore_missing=True, *, after_scale=None):
+def load_image_from_file(filename, ignore_missing=False, *, after_scale=None):
     if filename not in loaded_images:
         log("Load image:", filename)
         try:
@@ -121,7 +122,8 @@ class ColorBorderDrawer:
                  pygame.Rect(pos[0], pos[1] + height - thickness, width, thickness),
                  pygame.Rect(pos[0], pos[1], thickness, height),
                  pygame.Rect(pos[0] + width - thickness, pos[1], thickness, height)]
-        [pygame.draw.rect(surface, color, rect) for rect in rects]
+        for rect in rects:
+            surface.fill(color, rect)
         return rects
 
 cborders_cache = {}
@@ -199,3 +201,21 @@ def animation_h_from_file(filename, frame_height, tick):
         image = load_image_from_file(filename)
         loaded_animations_h[params] = Animation.from_surface_h(image, frame_height, tick)
     return loaded_animations_h[params]
+
+
+class ValueRotationDependent:
+    def __init__(self, right, left, up, down):
+        self.right, self.left, self.up, self.down = right, left, up, down
+
+    def __getitem__(self, key):
+        return getattr(self, key)
+
+    @property
+    def as_list(self):
+        return [self.right, self.left, self.up, self.down] 
+
+def all_rotations(right):
+    left = pygame.transform.flip(right, 1, 0) # surface, xbool, ybool
+    down = pygame.transform.rotate(right, -90)
+    up = pygame.transform.flip(down, 0, 1)
+    return ValueRotationDependent(right, left, up, down)

@@ -4,12 +4,23 @@ import pygame
 
 import json_ext as json
 import imglib
+from imglib import ValueRotationDependent, all_rotations
 from basesprite import BaseSprite
+import projectiles
 from abc_playeritem import AbstractPlayerItem
+import utils
 
+config_inventory_gui = json.loadf("configs/player_inventory.json")
+slot_size_t = config_inventory_gui["slot_size"]
+slot_border_width = config_inventory_gui["slot_border_width"]
+slot_size = slot_size_t[0]
+icon_size = 16
+icon_size_t = (icon_size, icon_size)
+
+config_dungeon = json.loadf("configs/dungeon.json")
 
 class DroppedItem(BaseSprite):
-    friendly = hostile = False # Passive
+    friendly = hostile = False
     def __init__(self, level, rectcenter, item_cls):
         super().__init__()
         self.level = level
@@ -39,31 +50,6 @@ class DroppedItem(BaseSprite):
     @classmethod
     def from_cache(cls, level, cache):
         return cls(level, cache["rect"].center, cache["item_cls"])
-
-
-class ValueRotationDependent:
-    def __init__(self, right, left, up, down):
-        self.right, self.left, self.up, self.down = right, left, up, down
-
-    def __getitem__(self, key):
-        return getattr(self, key)
-
-inventory_gui_config = json.loadf("configs/player_inventory.json")
-slot_size_t = inventory_gui_config["slot_size"]
-slot_border_width = inventory_gui_config["slot_border_width"]
-slot_size = slot_size_t[0]
-icon_size = 16
-icon_size_t = (icon_size, icon_size)
-
-dungeon_config = json.loadf("configs/dungeon.json")
-level_surface_size = dungeon_config["level_surface_size"]
-level_rect = pygame.Rect((0, 0), level_surface_size)
-
-def all_rotations(right):
-    left = pygame.transform.flip(right, 1, 0) # surface, xbool, ybool
-    down = pygame.transform.rotate(right, -90)
-    up = pygame.transform.flip(down, 0, 1)
-    return ValueRotationDependent(right, left, up, down)
 
 # ====== Bases =======
 
@@ -103,11 +89,11 @@ class BaseEdibleItem(AbstractPlayerItem):
 # ==== Swords ====
 
 class Sword(AbstractPlayerItem):
-    icon = imglib.load_image_from_file("images/sl/items/icons/sword_i.png", after_scale=icon_size_t)
+    icon = imglib.load_image_from_file("images/sl/items/icons/SwordI.png", after_scale=icon_size_t)
     bsize1, bsize2 = 30, 12
     size_r = ValueRotationDependent(right=(bsize1, bsize2), left=(bsize1, bsize2), 
                                     up=(bsize2, bsize1), down=(bsize2, bsize1))
-    image_r = all_rotations(imglib.load_image_from_file("images/sl/items/sword.png", after_scale=size_r.right))
+    image_r = all_rotations(imglib.load_image_from_file("images/sl/items/Sword.png", after_scale=size_r.right))
     dist_from_player = -6
 
     attack_length = 120
@@ -131,11 +117,10 @@ class Sword(AbstractPlayerItem):
     def update(self):
         if self.drawn:
             level = self.player.level
-            if level is not None:
-                for sprite in level.hostile_sprites:
-                    if self.rect.colliderect(sprite.rect) and sprite not in self.hit:
-                        sprite.take_damage(self.damage_dealt)
-                        self.hit.append(sprite)
+            for sprite in level.hostile_sprites:
+                if self.rect.colliderect(sprite.rect) and sprite not in self.hit:
+                    sprite.take_damage(self.damage_dealt)
+                    self.hit.append(sprite)
             self.ticks_left -= 1
             if not self.ticks_left:
                 self.drawn = False
@@ -172,16 +157,12 @@ class Sword(AbstractPlayerItem):
         return pygame.Rect(pos, self.size)
 
 class EnchantedSword(Sword):
-    icon = imglib.load_image_from_file("images/sl/items/icons/enchanted_sword_i.png", after_scale=icon_size_t)
-    image_r = all_rotations(imglib.load_image_from_file("images/sl/items/enchanted_sword.png", after_scale=Sword.size_r.right))
-    projectile_r = all_rotations(imglib.load_image_from_file("images/sl/items/projectiles/ethereal_sword.png", after_scale=Sword.size_r.right))
-
-    damage_dealt = 1
-    projectile_speed = 3
+    icon = imglib.load_image_from_file("images/sl/items/icons/EnchantedSwordI.png", after_scale=icon_size_t)
+    image_r = all_rotations(imglib.load_image_from_file("images/sl/items/EnchantedSword.png", after_scale=Sword.size_r.right))
 
     def __init__(self, player):
         super().__init__(player)
-        self.projectile_rect = self.projectile_img = None
+        self.projectile = None
 
     def use(self):
         if self.cooldown <= 0:
@@ -189,57 +170,42 @@ class EnchantedSword(Sword):
             self.rotation = self.player.rotation
             self.ticks_left = self.attack_length
             self.cooldown = round(self.ticks_left * 1.1)
-            if self.projectile_rect is None:
-                self.spawn_projectile(self.rect)
-        if self.player.activate_tile:
-            self.remove_projectile()
+            if self.projectile is None or self.projectile not in self.player.level.sprites:
+                self.projectile = projectiles.EtherealSword(self.player.level, self.rect.topleft, 
+                                                            rotation=self.rotation)
+                self.player.level.sprites.append(self.projectile)
+
+# ==== Staffs ====
+
+class FireballStaff(AbstractPlayerItem):
+    icon = imglib.load_image_from_file("images/sl/items/icons/FireballStaff.png", after_scale=icon_size_t)
+    special_use = True
+
+    def __init__(self, player):
+        super().__init__(player)
+        self.cooldown = 0
 
     def update(self):
-        super().update()
-        if self.projectile_rect is not None:
-            if self.rotation == "left": 
-                self.projectile_rect.x -= self.projectile_speed
-            elif self.rotation == "right": 
-                self.projectile_rect.x += self.projectile_speed
-            if self.rotation == "up": 
-                self.projectile_rect.y -= self.projectile_speed
-            if self.rotation == "down": 
-                self.projectile_rect.y += self.projectile_speed
-            for row in self.player.level.layout:
-                for tile in row:
-                    if not tile.passable and self.projectile_rect.colliderect(tile.rect):
-                        self.projectile_rect = None
-                        break
-                else:
-                    continue
-                break
-            if self.projectile_rect is not None:
-                for sprite in self.player.level.hostile_sprites:
-                    if sprite.hostile and self.projectile_rect.colliderect(sprite.rect):
-                        sprite.take_damage(self.damage_dealt / 2)
-                        self.remove_projectile()
-                        break
-            if self.projectile_rect is not None:
-                if not 0 < self.projectile_rect.x < level_rect.right or \
-                   not 0 < self.projectile_rect.y < level_rect.bottom:
-                    self.remove_projectile()
+        if self.cooldown >= 0:
+            self.cooldown -= 1
 
-    def spawn_projectile(self, rect):
-        self.projectile_rect = rect.copy()
-        self.projectile_img = self.projectile_r[self.rotation]
+    def use(self):
+        if self.cooldown <= 0:
+            self.cooldown = 40
+            fix = [-n for n in config_dungeon["level_surface_position"]]
+            pos = self.player.rect.center
+            vec = utils.norm_vector_to_mouse(*pos, fix)
+            proj = projectiles.Fireball(self.player.level, pos, norm_velocity=vec.normalize())
+            self.player.level.sprites.append(proj)
 
-    def remove_projectile(self):
-        self.projectile_rect = None
-
-    def draw(self, screen, pos_fix=(0, 0)):
-        super().draw(screen, pos_fix)
-        if self.projectile_rect is not None:
-            screen.blit(self.projectile_img, self.projectile_rect.move(pos_fix))
+    def can_use(self, events, pressed_keys, mouse_pos):
+        return pygame.mouse.get_pressed()[0] or pressed_keys[pygame.K_z]
+    
 
 # ====== Edible ======
 
 class Apple(BaseEdibleItem):
-    _dir = "images/sl/items/apple.png"
+    _dir = "images/sl/items/Apple.png"
     icon = imglib.load_image_from_file(_dir, after_scale=icon_size_t)
     size = (16, 16)
     surface = imglib.load_image_from_file(_dir, after_scale=size)

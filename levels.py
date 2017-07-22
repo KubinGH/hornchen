@@ -98,7 +98,8 @@ class BaseLevel(AbstractLevel):
             "uncovered": [],
             "tiles": []
         }
-        # This is should be set by the state that handles this level, and has a 'player' attribute
+        # This is should be set by the state that handles this level, and 
+        # has a 'player' and 'game' attribute
         self.parent = None
 
     def get_layout_copy(self):
@@ -118,7 +119,8 @@ class BaseLevel(AbstractLevel):
 
     def create_cache(self):
         cache = self.precache
-        cache["sprites"].extend(sprite.create_cache() for sprite in self.sprites)
+        cache["last_tick"] = self.parent.game.ticks
+        cache["sprites"].extend(sprite.create_cache() for sprite in self.sprites if sprite.cachable)
         for row, tilerow in enumerate(self.layout):
             for col, tile in enumerate(tilerow):
                 if tile.flags.PartOfHiddenRoom and tile.uncovered:

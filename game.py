@@ -1,5 +1,7 @@
 import copy
 
+import pygame
+
 from states import MainMenuState
 from player import PlayerCharacter
 
@@ -11,6 +13,7 @@ def log(*args, **kwargs):
 
 class GameEngine:
     default_vars = {
+        "DEBUG": True,
         "screen": None, "draw_surface": None, "screen_size": None,
         "level_caches": {}, "map": None, 
         "enable_fov": False, "enable_enemy_hp_bars": True
@@ -19,6 +22,7 @@ class GameEngine:
         self.vars = self.default_vars.copy()
         self.vars.update(kwargs)
         self.state_stack = []
+        self.ticks = 0
         self.player = PlayerCharacter(self)
         self.push_state_t(MainMenuState)
 
@@ -40,6 +44,14 @@ class GameEngine:
     def pop_state(self, i=-1):
         log("Pop state {} from the stack at index {}".format(type(self.state_stack[i]).__name__, i))
         return self.state_stack.pop(i)
+
+    def handle_state_changes(self, current_state, last_state):
+        if current_state is None: 
+            raise RuntimeError("No current state")
+        if last_state != current_state and last_state is not None and not last_state.deactivated:
+            last_state.pause()
+        if current_state.paused:
+            current_state.resume()
 
     def handle_events(self, state, events, pressed_keys, mouse_pos, *args, **kwargs):
         state.handle_events(events, pressed_keys, mouse_pos, *args, **kwargs)

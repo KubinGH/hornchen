@@ -59,15 +59,15 @@ class BaseEnemy(BaseSprite):
             if show_bar:
                 pos = self.hp_bar_rect.topleft
                 if self.dead:
-                    pygame.draw.rect(screen, Color.Red, self.hp_bar_rect.move(pos_fix))
+                    screen.fill(Color.Red, self.hp_bar_rect.move(pos_fix))
                 else:
                     px_healthy = min(round(self.health_points / self.max_health_points * self.hp_bar_size[0]), self.hp_bar_size[0])
                     px_damaged = self.hp_bar_size[0] - px_healthy
                     healthy_rect = pygame.Rect(pos, (px_healthy, self.hp_bar_size[1]))
-                    pygame.draw.rect(screen, Color.Green, healthy_rect.move(pos_fix))
+                    screen.fill(Color.Green, healthy_rect.move(pos_fix))
                     if px_damaged:
                         damaged_rect = pygame.Rect((pos[0] + px_healthy, pos[1]), (px_damaged, self.hp_bar_size[1]))
-                        pygame.draw.rect(screen, Color.Red, damaged_rect.move(pos_fix))
+                        screen.fill(Color.Red, damaged_rect.move(pos_fix))
         super().draw(screen, pos_fix)
 
     @property
@@ -98,7 +98,13 @@ class BaseEnemy(BaseSprite):
 
     def on_death(self):
         self.level.sprites.remove(self)
+        for dropped_item in self.get_item_drops(self.drops):
+            obj = playeritems.DroppedItem(self.level, self.rect.center, dropped_item)
+            self.level.sprites.append(obj)
 
+    @staticmethod
+    def get_item_drops(dropdict, specifier="any"):
+        return []
 
     def heal(self, value):
         self.take_damage(-value)
@@ -114,11 +120,6 @@ class GrayGoo(BaseEnemy):
     damage_on_player_touch = True
     size = (30, 30)
     surface = imglib.load_image_from_file("images/dd/enemies/GrayGoo.png", after_scale=size)
-    drops = {
-        "any": {
-            6: playeritems.Sword
-        }
-    }
     def __init__(self, level, spawner_tile):
         super().__init__(level, spawner_tile)
         self.ticks_to_wait = 0
@@ -162,3 +163,15 @@ class GrayGoo(BaseEnemy):
         obj = super().from_cache(level, spawner_tile, cache)
         obj.direction = cache["direction"]
         return obj
+
+
+class Warlock(BaseEnemy):
+    move_speed = 1
+    damage = 0.5
+    max_health_points = 2
+    damage_on_player_touch = True
+    size = (30, 30)
+    surface = imglib.load_image_from_file("images/dd/enemies/Warlock.png", after_scale=size)
+    def __init__(self, level, spawner_tile):
+        super().__init__(level, spawner_tile)
+        

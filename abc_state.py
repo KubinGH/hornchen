@@ -1,4 +1,5 @@
 import abc
+import pygame
 
 print("Load abstract base class of state")
 
@@ -6,6 +7,8 @@ class AbstractGameState(metaclass=abc.ABCMeta):
     # laziness makes the state force 60 fps limit, so that it doesn't
     # overuse the CPU doing literally nothing
     lazy_state = False
+    # only fill a part of the screen automatically, a rect
+    allowed_fill = pygame.Rect(0, 0, 0, 0)
     flags = set()
     @abc.abstractmethod
     def __init__(self, game):

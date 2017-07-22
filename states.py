@@ -50,8 +50,6 @@ class MainMenuState(AbstractGameState):
     config = json.loadf("configs/mainmenu.json")
     def __init__(self, game):
         super().__init__(game)
-
-        self.logo_sword = imglib.load_image_from_file("images/tr/LogoSword.png")
         self.bg_tile = imglib.load_image_from_file("images/dd/env/Bricks.png", after_scale=(40, 40))
         self.background = imglib.repeated_image_texture(self.bg_tile, self.game.vars["screen_size"])
         self.border_drawer = imglib.ColorBorderDrawer(self.game.vars["screen_size"], (0, 29, 109), 3)
@@ -224,20 +222,6 @@ class DungeonState(AbstractGameState):
         self.player.on_new_level()
         self.level.update()
 
-        pygame.mouse.set_visible(False)
-
-    def pause(self):
-        super().pause()
-        pygame.mouse.set_visible(True)
-
-    def resume(self):
-        super().resume()
-        pygame.mouse.set_visible(False)
-
-    def cleanup(self):
-        super().cleanup()
-        pygame.mouse.set_visible(True)
-
     def handle_events(self, events, pressed_keys, mouse_pos):
         for event in events:
             if event.type == pygame.KEYDOWN:
@@ -284,48 +268,31 @@ class DungeonState(AbstractGameState):
         opposite_dir = levels.opposite_dirs[direction]
         self.handle_next_level(last_x, last_y, next_x, next_y, direction, opposite_dir, True)
 
-    def handle_next_level(self, last_x, last_y, next_x, next_y, door_dir, entry_dir, use_interlude=True):
+    def handle_next_level(self, last_x, last_y, next_x, next_y, door_dir, entry_dir, use_interlude=True, use_time_pass=True):
         last_x = self.game.vars["player_mazepos"][0] if last_x is None else last_x
         last_y = self.game.vars["player_mazepos"][1] if last_y is None else last_y
         self.game.vars["level_caches"][(last_x, last_y)] = self.level.create_cache()
         self.game.pop_state()
         self.cleanup()
-        newlevel = self.game.vars["map"][next_y][next_x]
+        newlevelcls = self.game.vars["map"][next_y][next_x]
         self.game.vars["player_mazepos"] = (next_x, next_y)
-        if newlevel is None:
-            newlevel = levels.EmptyLevel
+        if newlevelcls is None:
+            newlevelcls = levels.EmptyLevel
         if (next_x, next_y) in self.game.vars["level_caches"]:
             cache = self.game.vars["level_caches"][(next_x, next_y)]
             print("Cache: {}".format(cache))
-            newlevelobj = newlevel.load_from_cache(cache)
+            newlevelobj = newlevelcls.load_from_cache(cache)
         else:
-            newlevelobj = newlevel()
+            cache = None
+            newlevelobj = newlevelcls()
         new_state = DungeonState(self.game, level=newlevelobj, entry_dir=entry_dir, 
                                  player=self.player)
+        if use_time_pass and cache is not None:
+            for i in range(min(1000, self.game.ticks - cache["last_tick"])):
+                new_state.level.update()
         if use_interlude:
-            # Draw a frame of the game in each state (those are on different levels),
-            # then save some of the UI elements (border, topbar) - static_elems,
-            # and then create and InterludeState.
-            ssize = self.game.vars["screen"].get_size()
-            # Crops used
-            levelcrop = pygame.Rect(self.config["level_surface_position"], self.config["level_surface_size"])
-            topbarcrop = pygame.Rect(self.config["topbar_position"], self.config["topbar_size"])
-            # Current (before)
-            surface1 = pygame.Surface(ssize)
-            self.draw(surface1, dplayer=False, dborder=False)
-            surface1 = surface1.subsurface(levelcrop)
-            # Next (after)
-            surface2 = pygame.Surface(ssize)
-            new_state.draw(surface2, dplayer=False, dui=True, dborder=False)
-            topbar = surface2.subsurface(topbarcrop) # The updated topbar, e.g. minimap
-            surface2 = surface2.subsurface(levelcrop)
-
-            interlude_way = reverse_directions[directions_base[door_dir]]
-            static_elems = [(self.config["topbar_position"], topbar)]
-            drawers = [(self.border_drawer, TOPLEFT)]
-            interlude = InterludeState(self.game, first=surface1, second=surface2, way=interlude_way, 
-                                       static_elems=static_elems, drawers=drawers, fix=self.config["level_surface_position"])
-
+            interlude = InterludeState.from_dungeon_states(self, new_state, door_dir)
+            
         self.game.push_state(new_state)
         if use_interlude:
             self.game.push_state(interlude)
@@ -338,66 +305,69 @@ class DungeonState(AbstractGameState):
 # 'second' and 'way' keyword arguments. 
 # The 'way' argument is a string: either 
 # "left", "right", "up" or "down".
+# Note 2: "dynamic" is very slow because of the surfaces
+# being constantly drawn.
 
 class InterludeState(AbstractGameState):
-    def __init__(self, game, *, first, second, way, speed=3, static_elems=[], drawers=[], fix=(0, 0)):
+    config_dungeon = json.loadf("configs/dungeon.json")
+    def __init__(self, game, *, first, second, way, tick_length=300,
+                                static_elems=[], drawers=[], fix=(0, 0), 
+                                dynamic=False, old_state=None, new_state=None, dynamic_new_surface_delay=3):
         super().__init__(game)
 
+        # way is from which door the player appears on the second surface
+
         self.first, self.second = first, second
-        self.way, self.speed = way, speed
+        self.way = way
+        self.tick_length = tick_length
         self.static_elems = static_elems
         self.drawers = drawers
         self.fix = fix
+        self.dynamic = dynamic
+        self.old_state, self.new_state = old_state, new_state
+        self.dynamic_new_surface_delay_value = dynamic_new_surface_delay
+        self.dynamic_new_surface_delay = self.dynamic_new_surface_delay_value
+        if self.old_state is None or self.new_state is None:
+            self.dynamic = False
 
         # Merge the two surfaces and then
         # handle the way it scrolls
         assert self.way in ("left", "right", "up", "down")
-        first_w, first_h = self.first.get_size()
-        second_w, second_h = self.second.get_size()
-        if self.way == "left" or self.way == "right":
-            surface_size = (first_w + second_w,
-                            max(first_h, second_h))
-        else:
-            surface_size = (max(first_w, second_w),
-                            first_h + second_h)
-        self.surface = pygame.Surface(surface_size)
+        self.surface = self.get_merged_surface(first, second, way)
         self.rect = self.surface.get_rect()
 
+        first_w, first_h = self.first.get_size()
+        second_w, second_h = self.second.get_size()
+        self.tick = 0
+        print(self.way)
         if self.way == "left":
             self.rect.x = 0
-            self.surface.blit(self.first, (0, 0))
-            self.surface.blit(self.second, (first_w, 0))
-            self.ticks_left = first_w // speed
+            self.ease_args = (0, first_w, self.tick_length)
         elif self.way == "right":
             self.rect.x = -self.second.get_width()
-            self.surface.blit(self.second, (0, 0))
-            self.surface.blit(self.first, (second_w, 0))
-            self.ticks_left = second_w // speed
+            self.ease_args = (-second_w, second_w, self.tick_length)
         elif self.way == "up":
             self.rect.y = 0
-            self.surface.blit(self.first, (0, 0))
-            self.surface.blit(self.second, (0, first_h))
-            self.ticks_left = first_h // speed
+            self.ease_args = (0, first_h, self.tick_length)
         elif self.way == "down":
             self.rect.y = -self.second.get_height()
-            self.surface.blit(self.second, (0, 0))
-            self.surface.blit(self.first, (0, second_h))
-            self.ticks_left = second_h // speed
+            self.ease_args = (-second_h, second_h, self.tick_length)
 
     def handle_events(self, events, pressed_keys, mouse_pos):
         pass
 
     def update(self):
+        self.tick += 1
+        v = self.ease_in_out_cubic(self.tick, *self.ease_args)
         if self.way == "left":
-            self.rect.x -= self.speed
+            self.rect.x = -v
         elif self.way == "right":
-            self.rect.x += self.speed
+            self.rect.x = v
         elif self.way == "up":
-            self.rect.y -= self.speed
+            self.rect.y = -v
         elif self.way == "down":
-            self.rect.y += self.speed
-        self.ticks_left -= 1
-        if self.ticks_left == 0:
+            self.rect.y = v
+        if self.tick == self.tick_length:
             if self.way == "left":
                 self.rect.x = -self.first.get_width()
             elif self.way == "right":
@@ -406,9 +376,20 @@ class InterludeState(AbstractGameState):
                 self.rect.y = -self.first.get_height()
             elif self.way == "down":
                 self.rect.y = 0
-        if self.ticks_left == -1:
+
+        if self.tick == self.tick_length + 1:
             self.game.pop_state()
             self.cleanup()
+        elif self.dynamic:
+            s1, s2, _ = self.get_dungeon_state_crops(self.old_state, self.new_state, dotopbar=False)
+            if self.dynamic_new_surface_delay <= 0:
+                self.get_merged_surface(s1, s2, self.way, out=self.surface)
+                self.dynamic_new_surface_delay = self.dynamic_new_surface_delay_value
+            else:
+                self.dynamic_new_surface_delay -= 1
+            self.old_state.level.update()
+            self.new_state.level.update()
+        #print(v)
 
     def draw(self, screen):
         if self.fix == (0, 0):
@@ -420,6 +401,73 @@ class InterludeState(AbstractGameState):
         for drawer, pos in self.drawers:
             drawer.draw(screen, pos)
 
+    @staticmethod
+    def ease_in_out_cubic(time, start_value, value_increase, total_time):
+        time /= total_time / 2
+        if time < 1:
+            return value_increase / 2 * time**3 + start_value
+        time -= 2
+        return value_increase / 2 * (time**3 + 2) + start_value
+
+    @staticmethod
+    def get_merged_surface(first, second, way, out=None):
+        first_w, first_h = first.get_size()
+        second_w, second_h = second.get_size()
+        if out is None:
+            if way == "left" or way == "right":
+                surface = pygame.Surface((first_w + second_w, max(first_h, second_h)))
+            elif way == "up" or way == "down":
+                surface = pygame.Surface((max(first_w, second_w), first_h + second_h))
+        else:
+            surface = out
+        if way == "left":
+            surface.blit(first, (0, 0))
+            surface.blit(second, (first_w, 0))
+        elif way == "right":
+            surface.blit(second, (0, 0))
+            surface.blit(first, (second_w, 0))
+        elif way == "up":
+            surface.blit(first, (0, 0))
+            surface.blit(second, (0, first_h))
+        elif way == "down":
+            surface.blit(second, (0, 0))
+            surface.blit(first, (0, second_h))
+        return surface
+
+    @classmethod
+    def from_dungeon_states(cls, old_state, new_state, door_dir):
+        ssize = old_state.game.vars["screen"].get_size()
+        surface1, surface2, topbar = cls.get_dungeon_state_crops(old_state, new_state)
+        interlude_way = reverse_directions[directions_base[door_dir]]
+        # Save some UI elements (border, topbar).
+        conf = cls.config_dungeon
+        static_elems = [(conf["topbar_position"], topbar)]
+        drawers = [(old_state.border_drawer, TOPLEFT)]
+        return InterludeState(old_state.game, first=surface1, second=surface2, way=interlude_way, 
+                              static_elems=static_elems, drawers=drawers, fix=conf["level_surface_position"],
+                              old_state=old_state, new_state=new_state)
+
+    @classmethod
+    def get_dungeon_state_crops(cls, old_state, new_state, dotopbar=True):
+        # Draw a frame of the game in each state (those are on different levels)
+        ssize = old_state.game.vars["screen"].get_size()
+        # Crops used
+        conf = cls.config_dungeon
+        levelcrop = pygame.Rect(conf["level_surface_position"], conf["level_surface_size"])
+        topbarcrop = pygame.Rect(conf["topbar_position"], conf["topbar_size"])
+        # Current (before)
+        surface1 = pygame.Surface(ssize)
+        old_state.draw(surface1, dplayer=False, dborder=False)
+        surface1 = surface1.subsurface(levelcrop)
+        # Next (after)
+        surface2 = pygame.Surface(ssize)
+        new_state.draw(surface2, dplayer=False, dui=True, dborder=False)
+        if dotopbar:
+            topbar = surface2.subsurface(topbarcrop) # The updated topbar, e.g. minimap
+        else:
+            topbar = None
+        surface2 = surface2.subsurface(levelcrop)
+        return surface1, surface2, topbar
 
 # ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 # ===== ===== ===== Player Inventory State  ===== ===== =====
@@ -438,6 +486,13 @@ class PlayerInventoryState(AbstractGameState):
     icon_size = slot_size - (2 * slot_border_width)
     icon_size_t = (icon_size, icon_size)
     lazy_state = True
+    bg_tile = imglib.load_image_from_file("images/dd/env/BricksSmall.png", after_scale=(20, 20))
+    border_tile = imglib.load_image_from_file("images/dd/env/Wall.png", after_scale=(20, 20))
+    slot_img = imglib.load_image_from_file("images/sl/player_inv/Slot.png", after_scale=slot_size_t)
+    selected_slot_img = imglib.load_image_from_file("images/sl/player_inv/SelectedSlot.png", after_scale=slot_size_t)
+    pointed_slot_img = imglib.load_image_from_file("images/sl/player_inv/PointedSlot.png", after_scale=slot_size_t)
+    swapping_slot_img = imglib.load_image_from_file("images/sl/player_inv/SwappingSlot.png", after_scale=slot_size_t)
+
     def __init__(self, game, *, parent_surface=None):
         super().__init__(game)
 
@@ -459,14 +514,11 @@ class PlayerInventoryState(AbstractGameState):
         self.back_dimmer.set_alpha(125)
         self.surface.blit(self.back_dimmer, TOPLEFT)
 
-        self.bg_tile = imglib.load_image_from_file("images/dd/env/BricksSmall.png", after_scale=(20, 20))
-        self.border_tile = imglib.load_image_from_file("images/dd/env/Wall.png", after_scale=(20, 20))
         self.background = imglib.repeated_image_texture(self.bg_tile, self.window_size)
         self.surface.blit(self.background, self.window_pos)
         self.background_border = imglib.image_border(self.window_size, self.border_tile)
         self.surface.blit(self.background_border, self.window_pos)
 
-        self.slot_img = imglib.load_image_from_file("images/sl/player_inv/slot.png", after_scale=self.slot_size_t)
         startx, starty = self.slots_start_pos
         self.slot_positions = []
         self.item_icon_positions = []
@@ -479,9 +531,6 @@ class PlayerInventoryState(AbstractGameState):
                 self.slot_positions.append((x, y))
                 xi, yi = x + self.slot_border_width, y + self.slot_border_width
                 self.item_icon_positions.append((xi, yi))
-        self.selected_slot_img = imglib.load_image_from_file("images/sl/player_inv/selected_slot.png", after_scale=self.slot_size_t)
-        self.pointed_slot_img = imglib.load_image_from_file("images/sl/player_inv/pointed_slot.png", after_scale=self.slot_size_t)
-        self.swapping_slot_img = imglib.load_image_from_file("images/sl/player_inv/swapping_slot.png", after_scale=self.slot_size_t)
         if self.player.near_container is not None:
             self.container = self.player.near_container
             self.c_slot_positions = []
@@ -530,7 +579,7 @@ class PlayerInventoryState(AbstractGameState):
             screen.blit(self.swapping_slot_img, self.slot_positions[self.swapping_idx])
         screen.blit(self.selected_slot_img, self.slot_positions[self.player.selected_item_idx])
         for pos, item in zip(self.item_icon_positions, self.inventory.slots):
-            if item is not None and hasattr(item, "icon"):
+            if item is not None and item.icon is not None:
                 screen.blit(imglib.scale(item.icon, self.icon_size_t), pos)
 
 

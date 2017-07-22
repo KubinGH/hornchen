@@ -17,20 +17,23 @@ class EmbeddedInterpreter:
         self.own_namespace = {}
 
     def run(self, code, namespace):
+        namespace.update(self.own_namespace)
         try:
             try:
-                result = eval(code, namespace, self.own_namespace)
+                result = eval(code, namespace)
             except SyntaxError:
-                if any(string in code for string in ("del", "=")):
-                    exec(code, namespace, self.own_namespace)
+                try:
+                    exec(code, namespace)
                     return ""
+                except Exception as e:
+                    return "[ERROR]{}: {}".format(type(e).__name__, str(e))
             else:
                 return str(result)
         except BaseException as e:
             if isinstance(e, SystemExit):
                 raise
             else:
-                return "{}: {}".format(type(e).__name__, str(e))
+                return "[ERROR]{}: {}".format(type(e).__name__, str(e))
         return ""
 
 def shift_pressed(pressed_keys):
@@ -79,7 +82,7 @@ class GameConsole:
         self.last_line = None
         self.erase_all()
 
-    def update(self, mouse_pos, pressed_keys, events, namespace=None):
+    def update(self, events, pressed_keys, mouse_pos, namespace=None):
         self.changed = False
         interpret_status = False
         edited_events = []
@@ -95,8 +98,8 @@ class GameConsole:
                             key += self.uppercase_fix
                         elif key in self.shift_fixes:
                             key = self.shift_fixes[key]
-                    key = chr(key)
-                    self.current_line += key
+                    keych = chr(key)
+                    self.current_line += keych
                     self.re_render_current()
                     self.changed = True
                 elif event.key == pygame.K_BACKSPACE:
@@ -122,6 +125,11 @@ class GameConsole:
             if not mute:
                 edited_events.append(event)
         events.clear(); events.extend(edited_events)
+        for k in self.valid_chars:
+            try:
+                pressed_keys[k] = 0
+            except IndexError:
+                pass
         if interpret_status:
             return self.Status.Interpret
         else:
@@ -171,7 +179,11 @@ class GameConsole:
         if result:
             log("Result:\n {}".format(result))
             try:
-                rend = fontutils.get_multiline_text_render(self.font, result, False, Color.White, 
+                color = Color.White
+                if result.startswith("[ERROR]"):
+                    color = Color.Red
+                    result = result[7:]
+                rend = fontutils.get_multiline_text_render(self.font, result, False, color, 
                                                            None, self.linegap, False)
             except pygame.error as e:
                 rend = fontutils.get_text_render(self.font, "[Error while rendering output! '{}']".format(str(e)),

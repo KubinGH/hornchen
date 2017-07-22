@@ -2,14 +2,15 @@ import io
 import zipfile
 from os import listdir
 
-enable_resource_zip = False
+enable_resource_zip = True
+resource_zip_filename = "resources.zip"
 
 archive = None
 c_open = open
 
-if enable_resource_zip:
+if enable_resource_zip and resource_zip_filename in listdir():
     print("Load resource zip hook")
-    archive = zipfile.ZipFile("resources.zip", "r")
+    archive = zipfile.ZipFile(resource_zip_filename, "r")
     def open(filename, mode="r"):
         # The mode is muted, since we only read from the archive
         try:
@@ -39,4 +40,4 @@ if enable_resource_zip:
         return [elem.split("/")[-1] for elem in archive.namelist()
                 if elem.startswith(directory) and elem.count("/") == directory.count("/") + 1]
 else:
-    pass
+    enable_resource_zip = False

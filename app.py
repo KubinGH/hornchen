@@ -7,26 +7,30 @@ import pygame
 WINDOW_SIZE = (1024, 768)
 MAP_SIZE = (10, 10)
 MAX_FPS = 0
-FULLSCREEN_FLAGS = pygame.HWSURFACE | pygame.FULLSCREEN | pygame.DOUBLEBUF
-NORMAL_FLAGS = 0
+FULLSCREEN_FLAGS = pygame.HWACCEL | pygame.HWSURFACE | pygame.FULLSCREEN | pygame.DOUBLEBUF
+NORMAL_FLAGS = pygame.HWACCEL
+PROFILE = True
 
 fullscreen = False 
 
 # We need to create a screen before importing so that a video mode is set,
 # and we are able to .convert() images.
 pygame.init()
+print("Start loading game")
 if fullscreen:
     flags = FULLSCREEN_FLAGS
 else:
     flags = NORMAL_FLAGS
+print("Create screen")
 screen = pygame.display.set_mode(WINDOW_SIZE, flags)
 
 import game
 import fontutils
 from colors import Color
 import gameconsole
+import zipopen # The app must close the archive
 # These are imported to be used by the console
-import states, leveltiles, enemies, playeritems
+import states, leveltiles, enemies, playeritems, projectiles
 
 
 def alt_pressed(pressed_keys):
@@ -36,9 +40,9 @@ def shift_pressed(pressed_keys):
     return pressed_keys[pygame.K_LSHIFT] or pressed_keys[pygame.K_RSHIFT]
 
 def exit_event(event, pressed_keys):
-    return (event.type == pygame.QUIT) or \
+    return event.type == pygame.QUIT or \
            (event.type == pygame.KEYDOWN and \
-                event.key == pygame.K_q and alt_pressed(pressed_keys))
+                (event.key in (pygame.K_q, pygame.K_F4) and alt_pressed(pressed_keys)))
 
 def center_fix(outer_rect, inner_rect):
     return ((outer_rect.width - inner_rect.width) // 2, (outer_rect.height - inner_rect.height) // 2)
@@ -53,7 +57,8 @@ class App:
         "states": states,
         "leveltiles": leveltiles,
         "enemies": enemies,
-        "playeritems": playeritems
+        "playeritems": playeritems,
+        "projectiles": projectiles
     }
     def __init__(self, screen=None, use_dirty_rects=False):
         self.screen = screen
@@ -87,18 +92,20 @@ class App:
         def give(arg):
             cls = getattr(playeritems, arg) if isinstance(arg, str) else arg
             return player.inventory.add_item(cls(player))
-        console_functions = [get_level, spawn_enemy, get_sprite_by_class]
-        self.console_namespace_additions.update({func.__name__: func for func in console_functions})
-
+        def ring_of_fire():
+            lev = get_level()
+            fire = projectiles.Fireball
+            for i in range(360):
+                lev.sprites.append(fire.from_angle(lev, player.rect.topleft, i))
+            
         # Main loop
         pause = False
-        ticks = 0
         clock = pygame.time.Clock()
         running = True
         while running:
             # Event
             mouse_pos = pygame.mouse.get_pos()
-            pressed_keys = pygame.key.get_pressed()
+            pressed_keys = list(pygame.key.get_pressed())
             events = pygame.event.get()
             for event in events:
                 if exit_event(event, pressed_keys):
@@ -132,17 +139,13 @@ class App:
                 continue
             last_state = current_state
             current_state = self.game.top_state
-            if current_state is None: 
-                raise RuntimeError("No current state")
-            if last_state != current_state and last_state is not None and not last_state.deactivated:
-                last_state.pause()
-            if current_state.paused:
-                current_state.resume()
+
+            self.game.handle_state_changes(current_state, last_state)
 
             # Some events (e.g. letter keypresses) are muted by the console,
             # so we need to process it first.
             if console_enabled:
-                constatus = self.console.update(mouse_pos, pressed_keys, events)
+                constatus = self.console.update(events, pressed_keys, mouse_pos)
 
             self.game.handle_events(current_state, events, pressed_keys, mouse_pos)
             pygame.event.pump()
@@ -153,8 +156,7 @@ class App:
             
             # Draw
 
-            self.screen.fill(Color.Black)
-
+            self.screen.fill(Color.Black, current_state.allowed_fill)
             self.game.draw(current_state, self.screen)
 
             if console_enabled:
@@ -164,7 +166,7 @@ class App:
                     self.console.interpret_current(namespace)
                 self.console.draw(self.screen)
             if show_fps:
-                if not ticks % 120 or force_show_fps:
+                if not self.game.ticks % 120 or force_show_fps:
                     current_fps = round(clock.get_fps())
                     render = fontutils.get_text_render(fpsfont, str(current_fps), False, Color.Red, dolog=False)
                 fps_rect = render.get_rect()
@@ -178,20 +180,24 @@ class App:
             else:
                 max_fps = act_max_fps
             clock.tick(max_fps)
-            ticks += 1
+            self.game.ticks += 1
 
         pygame.quit()
+        if zipopen.archive is not None:
+            zipopen.archive.close()
 
 
 if __name__ == "__main__":
     print("Screen size:", WINDOW_SIZE)
-    profiler = cProfile.Profile()
-    profiler.enable()
+    if PROFILE:
+        profiler = cProfile.Profile()
+        profiler.enable()
     app = App(screen)
     app.run()
-    profiler.disable()
-    profiler.dump_stats("profile.stats")
-    stats = pstats.Stats("profile.stats")
-    stats.strip_dirs(); stats.sort_stats("ncalls")
-    #stats.print_stats()
+    if PROFILE:
+        profiler.disable()
+        profiler.dump_stats("profile.stats")
+        stats = pstats.Stats("profile.stats")
+        stats.strip_dirs(); stats.sort_stats("ncalls")
+        stats.print_stats()
 

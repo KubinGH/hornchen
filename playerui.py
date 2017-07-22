@@ -136,7 +136,7 @@ class SelectedItemBoxWidget(AbstractUIWidget):
     icon_move = config_ui["selected_item_box_icon_move"]
     icon_pos = (box_pos[0] + icon_move[0], box_pos[1] + icon_move[1])
     icon_size = config_ui["selected_item_box_icon_size"]
-    box_image = imglib.load_image_from_file("images/sl/ui/selected_item_box.png", after_scale=box_size)
+    box_image = imglib.load_image_from_file("images/sl/ui/SelectedItemBox.png", after_scale=box_size)
     def __init__(self, game, player):
         super().__init__(game, player)
         self.last_selected = self.last_icon = None

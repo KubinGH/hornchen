@@ -10,8 +10,10 @@ from basesprite import BaseSprite
 import playerui
 import playerinventory, playeritems
 
+import utils, projectiles
+
+
 #from libraries import fovlib
-from libraries import spriteutils
 
 print("Load player")
 
@@ -33,6 +35,8 @@ class PlayerCharacter(BaseSprite):
     base_move_speed = 2
     base_vision_radius = 16
 
+    starting_items = [playeritems.Sword, playeritems.EnchantedSword, playeritems.FireballStaff]
+
     # Static
     invincibility_ticks_on_damage = 120
     sprint_move_speed_gain = 4
@@ -46,7 +50,8 @@ class PlayerCharacter(BaseSprite):
                                                   after_scale=self.rect.size)
 
         self.inventory = playerinventory.PlayerInventory(self)
-        self.inventory.add_item(playeritems.Sword(self))
+        for item_cls in self.starting_items:
+            self.inventory.add_item(item_cls(self))
         self.selected_item_idx = 0
 
         self.reset_attributes()
@@ -56,6 +61,7 @@ class PlayerCharacter(BaseSprite):
         self.rotation = "right"
         self.going_through_door = False
         self.crouching = False
+        self.use_item = False
 
         self.fov_enabled = self.game.vars["enable_fov"]
         if self.fov_enabled:
@@ -79,20 +85,20 @@ class PlayerCharacter(BaseSprite):
 
     def handle_events(self, events, pressed_keys, mouse_pos):
         self.activate_tile = False
-        self.moving["left"]  = pressed_keys[pygame.K_LEFT]
-        self.moving["right"] = pressed_keys[pygame.K_RIGHT]
-        self.moving["up"]    = pressed_keys[pygame.K_UP]
-        self.moving["down"]  = pressed_keys[pygame.K_DOWN]
-        self.move_sprint     = pressed_keys[pygame.K_s]
+        self.moving["left"]  = pressed_keys[pygame.K_LEFT]  or pressed_keys[pygame.K_a]
+        self.moving["right"] = pressed_keys[pygame.K_RIGHT] or pressed_keys[pygame.K_d] 
+        self.moving["up"]    = pressed_keys[pygame.K_UP]    or pressed_keys[pygame.K_w]
+        self.moving["down"]  = pressed_keys[pygame.K_DOWN]  or pressed_keys[pygame.K_s]
+        self.move_sprint     = pressed_keys[pygame.K_v]
         self.crouching       = pressed_keys[pygame.K_c]
+        item = self.selected_item
         for event in events:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
                     self.activate_tile = True
                 elif event.key == pygame.K_z:
-                    item = self.selected_item
-                    if item is not None:
-                        item.use()
+                    if item is not None and not item.special_use:
+                        self.use_item = True
                 elif event.key == pygame.K_LEFT:
                     self.rotation = "left"
                 elif event.key == pygame.K_RIGHT:
@@ -101,10 +107,14 @@ class PlayerCharacter(BaseSprite):
                     self.rotation = "up"
                 elif event.key == pygame.K_DOWN:
                     self.rotation = "down"
-
+        if item.special_use:
+            self.use_item = item.can_use(events, pressed_keys, mouse_pos)
 
     def update(self):
         self.reset_attributes()
+        if self.use_item:
+            self.selected_item.use()
+            self.use_item = False
         if self.move_sprint:
             self.move_speed += self.sprint_move_speed_gain
         self.inventory.update()
@@ -160,12 +170,13 @@ class PlayerCharacter(BaseSprite):
             for row in self.level.layout:
                 for tile in row:
                     if not self.level_vision[tile.row_idx][tile.col_idx]:
-                        pygame.draw.rect(screen, Color.Black, tile.rect.move(pos_fix))
+                        screen.fill(Color.Black, tile.rect.move(pos_fix))
         super().draw(screen, pos_fix)
         self.inventory.draw_items(screen, pos_fix)
         if dui: self.draw_ui(screen, pos_fix)
 
     def draw_ui(self, screen, pos_fix=(0, 0)):
+        screen.fill(Color.Black, pygame.Rect(config_dungeon["topbar_position"], config_dungeon["topbar_size"]))
         if self.near_passage is not None:
             screen.blit(self.near_passage_text, config_ui["msg_pos"])
         self.minimap.draw(screen)

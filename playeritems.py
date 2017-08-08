@@ -35,7 +35,7 @@ class DroppedItem(BaseSprite):
     def update(self):
         player = self.level.parent.player
         if self.rect.colliderect(player.rect):
-            if player.inventory.first_empty != -1:
+            if not player.inventory.full:
                 player.inventory.add_item(self.item_cls(player))
                 self.level.sprites.remove(self)
 

@@ -71,6 +71,7 @@ def scale(surface, size, smooth=False):
             scale_cache[params] = scale(pygame.transform.scale2x(surface), size)
         else:
             scale_cache[params] = pygame.transform.scale(surface, size)
+        scale_cache[params] = scale_cache[params].convert_alpha()
     return scale_cache[params]
 
 def scale2x(surface):

@@ -51,6 +51,7 @@ class AbstractLevel(metaclass=abc.ABCMeta):
         that will handle this level, e.g. DungeonState.
         """
         self.sprites = SpriteContainer()
+        self.particles = []
         self.parent = None
         self.layout = self.get_layout_copy()
         self._hostile_sprites = []; self._hcheck = self.sprites.last_changed

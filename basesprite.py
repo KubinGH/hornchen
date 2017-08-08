@@ -22,7 +22,7 @@ def _clamp(number, minim, maxim):
     else:
         return number
 
-class BaseSprite:
+class BaseSprite(pygame.sprite.Sprite):
     cachable = True
     hostile = False
     friendly = False
@@ -31,6 +31,7 @@ class BaseSprite:
     surface = None
     move_speed = 0
     def __init__(self):
+        super().__init__()
         self._id = uuid.uuid4()
         self.rect = None
         self.level = None

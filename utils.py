@@ -1,5 +1,6 @@
 import pygame
 import math
+import random
 import collections
 
 print("Load utilities")
@@ -9,6 +10,10 @@ print("Load utilities")
 class Vector:
     def __init__(self, x, y):
         self.x, self.y = x, y
+
+    @classmethod
+    def uniform(cls, u):
+        return cls(random.uniform(-u, u), random.uniform(-u, u))
 
     def as_list(self):
         return [self.x, self.y]

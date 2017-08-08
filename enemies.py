@@ -18,24 +18,27 @@ def percent_chance(percent):
 
 class BaseEnemy(BaseSprite):
     hostile = True
-    move_speed = 0
-    damage = 0
-    max_health_points = 1
-    damage_on_player_touch = False
     hp_bar_gap = 4
     hp_bar_size = (32, 2)
+    base_move_speed = 0
+    base_damage = 0
+    base_max_health_points = 1
+    damage_on_player_touch = False
     drops = {}
     def __init__(self, level, spawner_tile):
         super().__init__()
         self.level, self.spawner_tile = level, spawner_tile
         self.rect = pygame.Rect((0, 0), self.size)
         self.rect.center = self.spawner_tile.rect.center
+        self.move_speed = self.damage = self.max_health_points = None
+        self.reset_attributes()
         self.health_points = self.max_health_points
 
     def __repr__(self):
         return "<{} @ {}>".format(type(self).__name__, self.rect.topleft)
 
     def update(self):
+        self.reset_attributes()
         player = self.level.parent.player
         if self.damage_on_player_touch and player is not None:
             if self.rect.colliderect(player.rect):
@@ -69,6 +72,11 @@ class BaseEnemy(BaseSprite):
                         damaged_rect = pygame.Rect((pos[0] + px_healthy, pos[1]), (px_damaged, self.hp_bar_size[1]))
                         screen.fill(Color.Red, damaged_rect.move(pos_fix))
         super().draw(screen, pos_fix)
+
+    def reset_attributes(self):
+        self.move_speed = self.base_move_speed
+        self.damage = self.base_damage
+        self.max_health_points = self.base_max_health_points
 
     @property
     def hp_bar_rect(self):
@@ -114,9 +122,9 @@ class BaseEnemy(BaseSprite):
         return self.health_points <= 0
 
 class GrayGoo(BaseEnemy):
-    move_speed = 1
-    damage = 0.5
-    max_health_points = 1
+    base_move_speed = 1
+    base_damage = 0.5
+    base_max_health_points = 1
     damage_on_player_touch = True
     size = (30, 30)
     surface = imglib.load_image_from_file("images/dd/enemies/GrayGoo.png", after_scale=size)

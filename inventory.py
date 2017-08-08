@@ -14,16 +14,16 @@ class BaseInventory:
         pass
 
     @property
-    def full_slots(self):
+    def empty_slots(self):
         return self.slots.count(self.empty_slot)
 
     @property
-    def empty_slots(self):
+    def full_slots(self):
         return self.slots_count - self.full_slots
 
     @property
     def full(self):
-        return self.full_slots == self.slots
+        return not self.empty_slots
 
     @property
     def first_empty(self):

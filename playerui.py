@@ -154,3 +154,12 @@ class SelectedItemBoxWidget(AbstractUIWidget):
         screen.blit(self.box_image, self.box_pos)
         if self.player.selected_item is not self.player.inventory.empty_slot:
             screen.blit(self.scaled_icon, self.icon_pos)
+
+class SelectedSpellBoxWidget(AbstractUIWidget):
+    box_pos = config_ui["selected_spell_box_pos"]
+    box_size = config_ui["selected_spell_box_size"]
+    icon_move = config_ui["selected_spell_box_icon_move"]
+    icon_pos = (box_pos[0] + icon_move[0], box_pos[1] + icon_move[1])
+    icon_size = config_ui["selected_spell_box_icon_size"]
+    box_image = imglib.load_image_from_file("images/sl/ui/SelectedSpellBox.png", after_scale=box_size)
+

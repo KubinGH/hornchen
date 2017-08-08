@@ -1,3 +1,4 @@
+import random
 from collections import deque
 
 import pygame
@@ -10,7 +11,7 @@ from basesprite import BaseSprite
 import playerui
 import playerinventory, playeritems
 
-import utils, projectiles
+import utils, projectiles, particles
 
 
 #from libraries import fovlib
@@ -71,8 +72,8 @@ class PlayerCharacter(BaseSprite):
         self.health_points = self.max_health_points
         self.invincibility_ticks = 0
 
-        self.info_font = fontutils.get_font("fonts/BookAntiqua.ttf", config_ui["infofont_size"])
-        self.near_passage_text = fontutils.get_text_render(self.info_font, "Press Space to go through the door", True, Color.White)
+        #self.info_font = fontutils.get_font("fonts/BookAntiqua.ttf", config_ui["infofont_size"])
+        #self.near_passage_text = fontutils.get_text_render(self.info_font, "Press Space to go through the door", True, Color.White)
 
         self.minimap = playerui.MinimapWidget(self.game, self)
         self.map_reveal = self.new_gamemap_map()
@@ -107,7 +108,7 @@ class PlayerCharacter(BaseSprite):
                     self.rotation = "up"
                 elif event.key == pygame.K_DOWN:
                     self.rotation = "down"
-        if item.special_use:
+        if item is not None and item.special_use:
             self.use_item = item.can_use(events, pressed_keys, mouse_pos)
 
     def update(self):
@@ -119,26 +120,33 @@ class PlayerCharacter(BaseSprite):
             self.move_speed += self.sprint_move_speed_gain
         self.inventory.update()
         self.item_box.update()
+        self.moving_last = self.moving.copy()
         if not self.crouching:
             self.handle_moving()
         self.near_passage = None
-        pcol, prow = self.closest_tile_index        
+        pcol, prow = self.closest_tile_index
+        ptile = self.level.layout[prow][pcol] 
+        next_to = self.get_tiles_next_to()
         # Near passages to other levels
         self.going_through_door = False
-        for col, row in self.get_tiles_next_to():
+        for col, row in next_to:
             tile = self.level.layout[row][col]
             if tile.flags.Passage:
                 self.near_passage = tile
                 break
         else:
-            tile = self.level.layout[prow][pcol]
-            if tile.flags.Passage:
-                self.near_passage = tile
-        if self.near_passage is not None and self.activate_tile:
-            self.going_through_door = True
+            if ptile.flags.Passage:
+                self.near_passage = ptile
+        if self.near_passage is not None:
+            if self.activate_tile or \
+              (self.rect.left == 0 and self.moving_last["left"]) or \
+              (self.rect.right == screen_size[0] and self.moving_last["right"]) or \
+              (self.rect.top == 0 and self.moving_last["up"]) or \
+              (self.rect.bottom == screen_size[1] and self.moving_last["down"]):
+                self.going_through_door = True
         # Near containers (chests)
         self.near_container = None
-        for col, row in self.get_tiles_next_to():
+        for col, row in next_to:
             tile = self.level.layout[row][col]
             if tile.flags.Container:
                 self.near_container = tile
@@ -151,8 +159,7 @@ class PlayerCharacter(BaseSprite):
                                  dest=self.level_vision)
             self.computed_fov_map[prow][pcol] = True
         # Hidden rooms
-        if self.level.layout[prow][pcol].flags.PartOfHiddenRoom and \
-                not self.level.layout[prow][pcol].uncovered:
+        if ptile.flags.PartOfHiddenRoom and not ptile.uncovered:
             self.explore_room()
         # Invincibility ticks
         if self.invincibility_ticks:
@@ -162,7 +169,7 @@ class PlayerCharacter(BaseSprite):
                 self.hearts.update_hearts()
             elif self.invincibility_ticks == 0:
                 self.invincible_hearts_render = False
-                self.hearts.update_hearts()
+                self.hearts.update_hearts()               
 
     def draw(self, screen, pos_fix=(0, 0), *, dui=True):
         if self.fov_enabled:
@@ -173,12 +180,11 @@ class PlayerCharacter(BaseSprite):
                         screen.fill(Color.Black, tile.rect.move(pos_fix))
         super().draw(screen, pos_fix)
         self.inventory.draw_items(screen, pos_fix)
-        if dui: self.draw_ui(screen, pos_fix)
 
     def draw_ui(self, screen, pos_fix=(0, 0)):
         screen.fill(Color.Black, pygame.Rect(config_dungeon["topbar_position"], config_dungeon["topbar_size"]))
-        if self.near_passage is not None:
-            screen.blit(self.near_passage_text, config_ui["msg_pos"])
+        #if self.near_passage is not None:
+        #    screen.blit(self.near_passage_text, config_ui["msg_pos"])
         self.minimap.draw(screen)
         self.hearts.draw(screen)
         self.item_box.draw(screen)
@@ -203,6 +209,9 @@ class PlayerCharacter(BaseSprite):
         self.move_speed = self.base_move_speed
         self.max_health_points = self.base_max_health_points
         self.vision_radius = self.base_vision_radius
+
+    def new_damage_particle(self):
+        return particles.Particle.from_sprite(self, 5, utils.Vector.uniform(2), 200, Color.Red)
 
     # Health
 
@@ -235,6 +244,8 @@ class PlayerCharacter(BaseSprite):
 
     def on_damage(self, value):
         self.hearts.update_hearts()
+        for i in range(random.randint(3, 15)):
+            self.level.particles.append(self.new_damage_particle())
 
     # Minimap
 

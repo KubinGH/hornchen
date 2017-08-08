@@ -10,6 +10,7 @@ from abc_state import AbstractGameState
 import levels
 from colors import Color
 import mapgen
+import easing
 from libraries import mazegen
 
 print("Load states")
@@ -244,12 +245,10 @@ class DungeonState(AbstractGameState):
     def draw(self, screen, *, dlevel=True, dplayer=True, dui=True, dborder=True):
         if dlevel:      
             self.level.draw(screen, self.pos_fix)
-
         if dplayer:     
             self.player.draw(screen, self.pos_fix)
-        elif not dplayer and dui:
+        if dui:
             self.player.draw_ui(screen, self.pos_fix)
-
         if dborder:
             self.border_drawer.draw(screen, TOPLEFT)
 
@@ -340,7 +339,6 @@ class InterludeState(AbstractGameState):
         first_w, first_h = self.first.get_size()
         second_w, second_h = self.second.get_size()
         self.tick = 0
-        print(self.way)
         if self.way == "left":
             self.rect.x = 0
             self.ease_args = (0, first_w, self.tick_length)
@@ -359,7 +357,7 @@ class InterludeState(AbstractGameState):
 
     def update(self):
         self.tick += 1
-        v = self.ease_in_out_cubic(self.tick, *self.ease_args)
+        v = easing.ease_in_out_cubic(self.tick, *self.ease_args)
         if self.way == "left":
             self.rect.x = -v
         elif self.way == "right":
@@ -393,22 +391,11 @@ class InterludeState(AbstractGameState):
         #print(v)
 
     def draw(self, screen):
-        if self.fix == (0, 0):
-            screen.blit(self.surface, self.rect)
-        else:
-            screen.blit(self.surface, (self.rect.x + self.fix[0], self.rect.y + self.fix[1]))
+        screen.blit(self.surface, self.rect.move(self.fix))
         for pos, surface in self.static_elems:
             screen.blit(surface, pos)
         for drawer, pos in self.drawers:
             drawer.draw(screen, pos)
-
-    @staticmethod
-    def ease_in_out_cubic(time, start_value, value_increase, total_time):
-        time /= total_time / 2
-        if time < 1:
-            return value_increase / 2 * time**3 + start_value
-        time -= 2
-        return value_increase / 2 * (time**3 + 2) + start_value
 
     @staticmethod
     def get_merged_surface(first, second, way, out=None):

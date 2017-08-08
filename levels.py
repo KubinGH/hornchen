@@ -88,7 +88,7 @@ class BaseLevel(AbstractLevel):
     def __init__(self):
         super().__init__()
         self.background = imglib.repeated_image_texture(self.bg_tile, level_surface_size)
-        self.current_render = pygame.Surface(level_surface_size)
+        self.current_render = pygame.Surface(level_surface_size).convert()
         self.force_full_update = True
         self.force_render_update = True
         self.transparency_map = self.create_transparency_map() # passability for collisions
@@ -158,7 +158,6 @@ class BaseLevel(AbstractLevel):
         return [[tile.passable for tile in row] for row in self.layout]
 
     def update_render(self):
-        self.current_render.fill(Color.Black)
         self.current_render.blit(self.background, TOPLEFT)
         for row in self.layout:
             for tile in row:
@@ -178,8 +177,10 @@ class BaseLevel(AbstractLevel):
                 if tile.needs_update:
                     tile.update()
         # The sprites may decide to remove themselves, so we need a copy
-        for sprite in self.sprites[:]:
+        for sprite in self.sprites.copy():
             sprite.update()
+        for particle in self.particles.copy():
+            particle.update()
 
     def handle_events(self, events, pressed_keys, mouse_pos):
         pass
@@ -191,6 +192,8 @@ class BaseLevel(AbstractLevel):
         screen.blit(self.current_render, fix)
         for sprite in self.sprites:
             sprite.draw(screen, fix)
+        for particle in self.particles:
+            particle.draw(screen, fix)
 
 # ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 # ===== ===== =====      Level Factory      ===== ===== =====

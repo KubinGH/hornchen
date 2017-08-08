@@ -41,18 +41,21 @@ def get_sysfont(source, size, bold=False, italic=False):
 
 
 render_cache = {}
-def get_text_render(font, text, antialias, color, background=None, dolog=True):
+def get_text_render(font, text, antialias, color, background=None, dolog=True, cache=True):
     params = (font, text, antialias, color, background)
     if params not in render_cache:
         if dolog: log("Text render: {}".format(params))
-        render_cache[params] = font.render(text, antialias, color, background).convert_alpha()
+        surface = font.render(text, antialias, color, background).convert_alpha()
+        if not cache:
+            return surface
+        render_cache[params] = surface
     return render_cache[params]
 
 multiline_render_cache = {}
-def get_multiline_text_render(font, text, antialias, color, background=None, linegap=2, dolog=False):
+def get_multiline_text_render(font, text, antialias, color, background=None, linegap=2, dolog=False, cache=True):
     params = (font, text, antialias, color, background, linegap)
     if params not in multiline_render_cache:
-        lines_render = [get_text_render(font, line, antialias, color, background, dolog)
+        lines_render = [get_text_render(font, line, antialias, color, background, dolog, cache)
                         for line in text.strip().split("\n")]
         width = max(surface.get_width() for surface in lines_render)
         height = sum(surface.get_height() for surface in lines_render) + \
@@ -65,5 +68,7 @@ def get_multiline_text_render(font, text, antialias, color, background=None, lin
         for render in lines_render:
             surface.blit(render, (0, current_height))
             current_height += render.get_height() + linegap
+        if not cache:
+            return surface
         multiline_render_cache[params] = surface
     return multiline_render_cache[params]

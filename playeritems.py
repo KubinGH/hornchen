@@ -10,6 +10,8 @@ import projectiles
 from abc_playeritem import AbstractPlayerItem
 import utils
 
+print("Load player items")
+
 config_inventory_gui = json.loadf("configs/player_inventory.json")
 slot_size_t = config_inventory_gui["slot_size"]
 slot_border_width = config_inventory_gui["slot_border_width"]
@@ -172,14 +174,13 @@ class EnchantedSword(Sword):
             self.cooldown = round(self.ticks_left * 1.1)
             if self.projectile is None or self.projectile not in self.player.level.sprites:
                 self.projectile = projectiles.EtherealSword(self.player.level, self.rect.topleft, 
-                                                            rotation=self.rotation)
+                                                            centerpos=False, rotation=self.rotation)
                 self.player.level.sprites.append(self.projectile)
 
 # ==== Staffs ====
 
 class FireballStaff(AbstractPlayerItem):
     icon = imglib.load_image_from_file("images/sl/items/icons/FireballStaff.png", after_scale=icon_size_t)
-    special_use = True
 
     def __init__(self, player):
         super().__init__(player)
@@ -192,28 +193,21 @@ class FireballStaff(AbstractPlayerItem):
     def use(self):
         if self.cooldown <= 0:
             self.cooldown = 40
-            fix = [-n for n in config_dungeon["level_surface_position"]]
             pos = self.player.rect.center
-            vec = utils.norm_vector_to_mouse(*pos, fix)
-            proj = projectiles.Fireball(self.player.level, pos, norm_velocity=vec.normalize())
+            vec = self.player.best_heading_vector
+            proj = projectiles.Fireball(self.player.level, pos, norm_velocity=vec)
             self.player.level.sprites.append(proj)
-
-    def can_use(self, events, pressed_keys, mouse_pos):
-        return pygame.mouse.get_pressed()[0] or pressed_keys[pygame.K_z]
-    
 
 # ====== Edible ======
 
 class Apple(BaseEdibleItem):
-    _dir = "images/sl/items/Apple.png"
-    icon = imglib.load_image_from_file(_dir, after_scale=icon_size_t)
+    icon = imglib.load_image_from_file("images/sl/items/Apple.png", after_scale=icon_size_t)
     size = (16, 16)
-    surface = imglib.load_image_from_file(_dir, after_scale=size)
+    surface = imglib.load_image_from_file("images/sl/items/Apple.png", after_scale=size)
     points_healed = 1
 
 class HealthPotion(BaseEdibleItem):
-    _dir = "images/dd/pickups/HealthPotion.png"
-    icon = imglib.load_image_from_file(_dir, after_scale=icon_size_t)
+    icon = imglib.load_image_from_file("images/dd/pickups/HealthPotion.png", after_scale=icon_size_t)
     size = (16, 16)
-    surface = imglib.load_image_from_file(_dir, after_scale=size)
+    surface = imglib.load_image_from_file("images/dd/pickups/HealthPotion.png", after_scale=size)
     points_healed = 4

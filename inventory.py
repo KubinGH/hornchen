@@ -1,3 +1,5 @@
+print("Load inventory")
+
 class BaseInventory:
     # Exceptionless: If inventory-manipulating operations fail,
     # no exceptions will be raised. Use return values to check

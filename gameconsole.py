@@ -1,4 +1,4 @@
-from code import InteractiveInterpreter
+import traceback
 
 import pygame
 
@@ -26,14 +26,16 @@ class EmbeddedInterpreter:
                     exec(code, namespace)
                     return ""
                 except Exception as e:
-                    return "[ERROR]{}: {}".format(type(e).__name__, str(e))
+                    #return "[ERROR]{}: {}".format(type(e).__name__, str(e))
+                    return "[ERROR]" + traceback.format_exc()
             else:
                 return str(result)
         except BaseException as e:
             if isinstance(e, SystemExit):
                 raise
             else:
-                return "[ERROR]{}: {}".format(type(e).__name__, str(e))
+                #return "[ERROR]{}: {}".format(type(e).__name__, str(e))
+                return "[ERROR]" + traceback.format_exc()
         return ""
 
 def shift_pressed(pressed_keys):
@@ -47,7 +49,7 @@ class GameConsole:
     config = json.loadf("configs/console.json")
     size = config["console_size"]
     background_color = config["console_background_color"]
-    font = fontutils.get_font("fonts/camingocode.ttf", 16)
+    font = fontutils.get_font("fonts/camingocode.ttf", 14)
     valid_letter_range = range(pygame.K_a, pygame.K_z + 1)
     valid_chars = set(range(pygame.K_0, pygame.K_9 + 1)) | set(valid_letter_range) | \
                   {pygame.K_ASTERISK, pygame.K_COMMA, pygame.K_PERIOD, pygame.K_EQUALS,
@@ -55,9 +57,15 @@ class GameConsole:
                    pygame.K_LEFTPAREN, pygame.K_RIGHTPAREN, pygame.K_QUESTION, 
                    pygame.K_SEMICOLON, pygame.K_COLON, pygame.K_PLUS, pygame.K_MINUS, 
                    pygame.K_UNDERSCORE, pygame.K_SPACE, pygame.K_QUOTE, pygame.K_QUOTEDBL,
-                   pygame.K_SLASH, pygame.K_BACKSLASH, pygame.K_DOLLAR}
+                   pygame.K_SLASH, pygame.K_BACKSLASH, pygame.K_DOLLAR, pygame.K_BACKQUOTE}
     shift_fixes = {
+        pygame.K_1:         pygame.K_EXCLAIM,
+        pygame.K_2:         pygame.K_AT,
+        pygame.K_3:         pygame.K_HASH,
         pygame.K_4:         pygame.K_DOLLAR,
+        pygame.K_5:         37, # percent sign
+        pygame.K_6:         pygame.K_CARET,
+        pygame.K_7:         pygame.K_AMPERSAND,
         pygame.K_8:         pygame.K_ASTERISK,
         pygame.K_9:         pygame.K_LEFTPAREN,
         pygame.K_0:         pygame.K_RIGHTPAREN,
@@ -66,10 +74,16 @@ class GameConsole:
         pygame.K_QUOTE:     pygame.K_QUOTEDBL,
         pygame.K_MINUS:     pygame.K_UNDERSCORE,
         pygame.K_LEFTBRACKET: 123,  # left curly bracket
-        pygame.K_RIGHTBRACKET: 125, # right curly bracket
+        pygame.K_RIGHTBRACKET: 125, # right curly bracket,
+        pygame.K_COMMA:     pygame.K_LESS,
+        pygame.K_PERIOD:    pygame.K_GREATER,
+        pygame.K_SLASH:     pygame.K_QUESTION,
+        pygame.K_BACKSLASH: 124, # pipe character
+        pygame.K_BACKQUOTE: 126, # tilde
     }
     uppercase_fix = -32 # a (97) -> A (65) when shift is pressed
     linegap = 1
+    history_length_limit = 100
     current_line_prefix = "> "
     def __init__(self, parent):
         self.parent = parent
@@ -79,7 +93,8 @@ class GameConsole:
         self.rect = self.output.get_rect()
         self.rect.x, self.rect.y = 0, 0
         self.current_line = None
-        self.last_line = None
+        self.history = []
+        self.history_pointer = 1
         self.erase_all()
 
     def update(self, events, pressed_keys, mouse_pos, namespace=None):
@@ -103,9 +118,7 @@ class GameConsole:
                     self.re_render_current()
                     self.changed = True
                 elif event.key == pygame.K_BACKSPACE:
-                    if shift:
-                        self.erase_all()
-                    elif self.current_line:
+                    if self.current_line:
                         self.current_line = self.current_line[:-1]
                         self.re_render_current()
                     self.changed = True
@@ -115,10 +128,26 @@ class GameConsole:
                         self.interpret_current(namespace)
                     else:
                         interpret_status = True
-                elif event.key == pygame.K_HOME:
-                    if self.last_line is not None:
-                        self.current_line = self.last_line
-                        self.last_line = None
+                elif event.key == pygame.K_DELETE:
+                    if not shift:
+                        self.erase_current()
+                    else:
+                        self.erase_all()
+                elif event.key == pygame.K_PAGEUP:
+                    if self.history:
+                        if self.history_pointer is None:
+                            self.history_pointer = 1
+                        elif self.history_pointer < len(self.history):
+                            self.history_pointer += 1
+                        self.current_line = self.history[-self.history_pointer]
+                        self.re_render_current()
+                elif event.key == pygame.K_PAGEDOWN:
+                    if self.history:
+                        if self.history_pointer is None:
+                            self.history_pointer = 1
+                        elif self.history_pointer > 1:
+                            self.history_pointer -= 1
+                        self.current_line = self.history[-self.history_pointer]
                         self.re_render_current()
                 else:
                     mute = False
@@ -161,7 +190,11 @@ class GameConsole:
         return rend
 
     def erase_current(self):
-        self.last_line = self.current_line
+        if self.current_line:
+            self.history.append(self.current_line)
+            self.history_pointer = None
+            while len(self.history) > self.history_length_limit:
+                self.history.pop(0)
         self.current_line = ""
         self.current_line_render = pygame.Surface((0, 0))
         self.re_render_current()

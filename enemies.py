@@ -5,7 +5,6 @@ import pygame
 import imglib
 import json_ext as json
 from colors import Color
-from libraries import spriteutils
 from basesprite import BaseSprite
 import playeritems # Drops
 

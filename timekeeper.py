@@ -1,6 +1,8 @@
 import sys
 import time
 
+print("Load debug time keeper")
+
 gtime = time.clock if sys.platform == "win32" else time.time
 
 class TValue:

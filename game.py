@@ -3,7 +3,9 @@ import copy
 import pygame
 
 from states import MainMenuState
+import mazegen, mapgen
 from player import PlayerCharacter
+import controls
 
 print("Load game engine")
 
@@ -16,7 +18,8 @@ class GameEngine:
         "DEBUG": True,
         "screen": None, "draw_surface": None, "screen_size": None,
         "level_caches": {}, "map": None, 
-        "enable_fov": False, "enable_enemy_hp_bars": True
+        "enable_fov": False, "forced_mouse": False,
+        "enable_enemy_hp_bars": True
     }
     def __init__(self, **kwargs):
         self.vars = self.default_vars.copy()
@@ -25,11 +28,21 @@ class GameEngine:
         self.ticks = 0
         self.player = None
         self.reset_game()
-        self.push_state_t(MainMenuState)
+        self.push_state(MainMenuState(self, fade_in=True))
 
     def reset_game(self):
         self.player = PlayerCharacter(self)
         self.vars["level_caches"].clear()
+
+    def new_game(self):
+        gen = mazegen.MazeGenerator(*self.vars["mapsize"])
+        gen.create2()
+        self.vars["maze"] = gen.data
+        self.vars["player_mazepos"] = gen.start_pos
+        self.vars["map"] = [[None for _ in range(gen.width)] for _ in range(gen.height)]
+        mapgen.generate_map(self.vars["map"], gen)
+        start_level = self.vars["map"][gen.start_pos[1]][gen.start_pos[0]]
+        return start_level
 
     @property
     def top_state(self):
@@ -59,7 +72,7 @@ class GameEngine:
             current_state.resume()
 
     def handle_events(self, state, events, pressed_keys, mouse_pos, *args, **kwargs):
-        state.handle_events(events, pressed_keys, mouse_pos, *args, **kwargs)
+        state.handle_events(events, controls.KeyboardState(pressed_keys), mouse_pos, *args, **kwargs)
 
     def update(self, state, *args, **kwargs):
         state.update(*args, **kwargs)
@@ -70,3 +83,9 @@ class GameEngine:
     @property
     def states_str(self):
         return [type(state).__name__ for state in self.state_stack]
+
+    @property
+    def use_mouse(self):
+        b = pygame.mouse.set_visible(False)
+        pygame.mouse.set_visible(b)
+        return b

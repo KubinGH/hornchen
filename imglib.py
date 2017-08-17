@@ -53,7 +53,7 @@ def simple_scale(surface, dwidth, dheight):
     return result
 
 scale_cache = {}
-def scale(surface, size, smooth=False):
+def scale(surface, size, smooth=False, *, docache=True):
     size = tuple(size)
     params = (surface, size)
     if params not in scale_cache:
@@ -71,7 +71,10 @@ def scale(surface, size, smooth=False):
             scale_cache[params] = scale(pygame.transform.scale2x(surface), size)
         else:
             scale_cache[params] = pygame.transform.scale(surface, size)
-        scale_cache[params] = scale_cache[params].convert_alpha()
+        result = scale_cache[params].convert_alpha()
+        if not docache:
+            return result
+        scale_cache[params] = result 
     return scale_cache[params]
 
 def scale2x(surface):
@@ -80,7 +83,7 @@ def scale2x(surface):
 
 
 loaded_images = {}
-def load_image_from_file(filename, ignore_missing=False, *, after_scale=None):
+def load_image_from_file(filename, ignore_missing=False, *, docache=True, after_scale=None):
     if filename not in loaded_images:
         log("Load image:", filename)
         try:
@@ -91,11 +94,16 @@ def load_image_from_file(filename, ignore_missing=False, *, after_scale=None):
                 this = get_missing_surface()
             else:
                 raise
+        if not docache:
+            if after_scale is None:
+                return this
+            else:
+                return scale(loaded_images[filename], after_scale, docache=docache)
         loaded_images[filename] = this
     if after_scale is None:
         return loaded_images[filename]
     else:
-        return scale(loaded_images[filename], after_scale)
+        return scale(loaded_images[filename], after_scale, docache=docache)
 
 repeatimg_cache = {}
 def repeated_image_texture(image, size):

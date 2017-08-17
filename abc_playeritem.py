@@ -1,5 +1,7 @@
 import abc
 
+print("Load abstract base class of player item")
+
 class AbstractPlayerItem(metaclass=abc.ABCMeta):
     icon = None
     dropped_size = (24, 24)

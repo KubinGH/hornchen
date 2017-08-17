@@ -1,3 +1,5 @@
+print("Load sprite utilities")
+
 def rect_cmove(rect, x, y, screen_rect):
     return rect.move(x, y).clamp(screen_rect)
 

@@ -7,6 +7,8 @@ class AbstractGameState(metaclass=abc.ABCMeta):
     # laziness makes the state force 60 fps limit, so that it doesn't
     # overuse the CPU doing literally nothing
     lazy_state = False
+    # shows mouse when this state is enabled
+    use_mouse = False
     # only fill a part of the screen automatically, a rect
     flags = set()
     @abc.abstractmethod
@@ -18,6 +20,8 @@ class AbstractGameState(metaclass=abc.ABCMeta):
         self.game = game
         self.paused = False
         self.deactivated = False
+        if self.use_mouse:
+            pygame.mouse.set_visible(True)
 
     def cleanup(self):
         """
@@ -27,6 +31,8 @@ class AbstractGameState(metaclass=abc.ABCMeta):
         """
         print("Deactivated state", self.__class__.__name__)
         self.deactivated = True
+        if self.use_mouse and not self.game.vars["forced_mouse"]:
+            pygame.mouse.set_visible(False)
     
     def pause(self):
         """
@@ -36,6 +42,8 @@ class AbstractGameState(metaclass=abc.ABCMeta):
         """
         print("Paused state", self.__class__.__name__)
         self.paused = True
+        if self.use_mouse and not self.game.vars["forced_mouse"]:
+            pygame.mouse.set_visible(False)
         
     def resume(self):
         """
@@ -44,6 +52,8 @@ class AbstractGameState(metaclass=abc.ABCMeta):
         """
         print("Resumed state", self.__class__.__name__)
         self.paused = False
+        if self.use_mouse:
+            pygame.mouse.set_visible(True)
 
     @abc.abstractmethod
     def handle_events(self):

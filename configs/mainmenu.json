@@ -1,17 +1,10 @@
 {
-    "fonts": {
-        "sizes": {
-            "font": 50,
-            "font_large": 90
-        }
-    },
     "positions": {
         "title_text": [40, 100],
-        "logo_sword": [720, 440],
         "buttons": {
             "start": [70, 390],
             "settings": [70, 440],
-            "dbg": [20, 600]
+            "exit": [60, 700]
         }
     }
 }

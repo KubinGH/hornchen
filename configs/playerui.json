@@ -1,4 +1,6 @@
 {
+    "screen_size": [1024, 768],
+
     "infofont_size": 30,
     "msg_pos": [10, 218],
 
@@ -11,8 +13,19 @@
     "hearts_gap": 8,
     "hearts_pos": [2, 2],
 
-    "selected_item_box_pos": [640, 20],
+    "mana_per_star": 20,
+    "star_main_color": [0, 30, 255],
+    "star_size": [40, 40],
+    "stars_gap": 8,
+    "stars_pos": [2, 50],
+
+    "selected_item_box_pos": [540, 20],
     "selected_item_box_size": [80, 100],
     "selected_item_box_icon_move": [8, 28],
-    "selected_item_box_icon_size": [64, 64]
+    "selected_item_box_icon_size": [64, 64],
+
+    "selected_spell_box_pos": [640, 20],
+    "selected_spell_box_size": [80, 100],
+    "selected_spell_box_icon_move": [8, 28],
+    "selected_spell_box_icon_size": [64, 64]
 }

@@ -1,0 +1,10 @@
+{
+    "positions": {
+        "settings_text": [60, 100],
+        "no_or_yes_right_side": 500,
+        "buttons": {
+            "use_mouse": [20, 200],
+            "back": [20, 600]
+        }
+    }
+}

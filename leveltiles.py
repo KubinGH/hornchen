@@ -8,6 +8,7 @@ from abc_leveltile import AbstractLevelTile
 from colors import Color
 import enemies
 from inventory import BaseInventory
+import utils
 
 print("Load level tiles")
 
@@ -140,41 +141,63 @@ class BaseSpawnerTile(EmptyTile):
 class GrayGooSpawner(BaseSpawnerTile):
     spawned_enemy = enemies.GrayGoo
 
+class SkeletonArcherSpawner(BaseSpawnerTile):
+    spawned_enemy = enemies.SkeletonArcher
 
 # ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 # ===== ===== =====        Containers       ===== ===== =====
 # ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 
 class BaseContainer(BaseTile):
-    needs_update = False
+    needs_update = True
     passable = True
+    transparent = True
     flags_template = FlagSet(TileFlags.Container)
     # Don't change this
     inventory_slots = 8
     def __init__(self, level, col_idx, row_idx, *, inventory_contents=[]):
-        super().__init__(self, level, col_idx, row_idx)
-        self.inventory = BaseInventory()
+        super().__init__(level, col_idx, row_idx)
+        self.inventory = BaseInventory.of_size(self.inventory_slots)
         # inventory_contents should be a list of item classes.
-        # They are initialized when taken from the inventory
-        # by a player.
         for item in inventory_contents:
-            self.inventory.add_item(item)
+            self.inventory.add_item(item(self.level.parent.player))
+        self.precache_entry = {
+            "col": self.col_idx, 
+            "row": self.row_idx, 
+            "inventory": self.create_inventory_cache()
+        }
+        self.level.precache["tiles"].append(self.precache_entry)
 
-    def take_item(self, arg, player):
-        # if the item is not yet initialized (never taken by a player)
-        if arg not in self.inventory.slots:
+    def update(self):
+        self.precache_entry["inventory"] = self.create_inventory_cache()
+
+    def load_cache(self, cache):
+        self.precache_entry["inventory"] = cache["inventory"]
+        for i, cache in cache["inventory"].items():
+            self.inventory.slots[i] = cache["type"].from_cache(self.level.parent.player, cache)
+
+    def on_open(self, player):
+        pass
+
+    def create_inventory_cache(self):
+        cache = {}
+        for i, item in enumerate(self.inventory.slots):
+            if item is not None:
+                cache[i] = item.create_cache()
+        return cache
+
+    def take_item(self, item, player):
+        if item not in self.inventory.slots:
             return None
-        if isinstance(arg, type):
-            item_constructor = arg
-            self.inventory.remove_item(item_constructor)
-            return item_constructor(player)
-        else:
-            item = arg
-            self.inventory.remove_item(item)
-            return item
+        self.inventory.remove_item(item)
+        return item
 
     def place_item(self, item):
         return self.inventory.add_item(item)
+
+class Chest(BaseContainer):
+    drawn_surface = imglib.load_image_from_file("images/sl/env/Chest.png", after_scale=tile_size_t)
+
 
 # ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 # ===== ===== =====          Parser         ===== ===== =====
@@ -185,7 +208,9 @@ parse_dict = {
     "~": DoorTile,
     ",": HiddenRoomTile,
     "-": HiddenRoomDoorTile,
-    "g": GrayGooSpawner
+    "g": GrayGooSpawner,
+    "s": SkeletonArcherSpawner,
+    "$": Chest
 }
 
 # We use flags_template since these are classes
@@ -198,3 +223,6 @@ def parse_layout(raw, level_obj):
     assert len(result[0]) == level_size[0] and not any(len(result[0]) != len(result[i]) for i in range(len(result))), \
            "Width of level must be equal to {}".format(level_size[0])
     return result
+
+
+register = utils.Register.gather_type(AbstractLevelTile, locals())

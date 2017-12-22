@@ -25,6 +25,7 @@ class Color:
     eBlue =     (  0,   0, 100)
 
     lPink =     (255, 200, 240)
+    Orange =    (255, 150,   0)
 
     colors = ["Black", "White",
               "lGray", "Gray", "dGray",
@@ -32,16 +33,17 @@ class Color:
               "Yellow", "Cyan", "Purple2",
               "Magenta", "Pink", "Purple",
               "lBlue", "dBlue", "eBlue",
-              "lPink"]
+              "lPink", "Orange"]
     
-    @classmethod
-    def with_alpha(self, alpha):
+    @staticmethod
+    def with_alpha(alpha):
         return _ColorWithAlpha(alpha)
 
-    def by_name(self, name):
-        name_lower = name.lower()
-        assert name_lower in self.COLORS
-        return getattr(self, name_lower)
+    @classmethod
+    def by_name(cls, name):
+        if name not in cls.colors:
+            return cls.White
+        return getattr(cls, name)
 
 _DUMMY = Color()
 
@@ -52,3 +54,5 @@ class _ColorWithAlpha:
     def __getattr__(self, name):
         return _DUMMY.by_name(name) + (self.alpha, )
         
+def invert_color(color):
+    return tuple(255 - c for c in color)

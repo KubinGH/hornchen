@@ -27,12 +27,19 @@ class MazeGenerator:
     def __repr__(self):
         return "MazeGenerator({}, {})".format(self.width, self.height) 
 
-    def pprint(self):
-        print("MazeGenerator {")
-        print("Data:")
-        for row in self.data:
-            print("\t", end="")
-            print(*row, sep=" ")
+    def pprint(self, prettier=False):
+        print("{!r} {{".format(self))
+        if not prettier:
+            for row in self.data:
+                print(*row, sep=" ")
+        else:
+            for y, row in enumerate(self.data):
+                for x, b in enumerate(row):
+                    if (x, y) == self.start_pos:
+                        print("$", end=" ")
+                    else:
+                        print("█" if b else " ", end=" ")
+                print()
         print("}")
 
     def fill_data(self, obj):

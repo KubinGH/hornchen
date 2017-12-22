@@ -1,17 +1,18 @@
+import math
 import random
 import warnings
 
 import pygame
 
 import json_ext as json
+import controls
 import fontutils
 import imglib
 from abc_state import AbstractGameState
 import levels
 from colors import Color
-import mapgen
 import easing
-import mazegen
+import spells
 
 print("Load states")
 
@@ -32,27 +33,49 @@ menu_font_large = fontutils.get_font("fonts/OldLondon.ttf", 90)
 
 
 class UIButton:
-    def __init__(self, name, text, font, pos, colors=(Color.White, Color.Yellow)):
+    def __init__(self, name, text, font, pos, is_active=lambda: True, colors=(Color.White, Color.Yellow)):
         self.name = name
         self.text, self.font = text, font
         self.pos, self.colors = pos, colors
+        self.is_active = is_active
         self.text_renders = [fontutils.get_text_render(self.font, text, True, color) for color in self.colors]
         self.rect = pygame.Rect(self.pos, self.text_renders[0].get_size())
         self.hovered_over = False
         self.pressed = False
 
     def handle_events(self, events, pressed_keys, mouse_pos):
+        if not self.is_active: return
         self.hovered_over = self.rect.collidepoint(mouse_pos)
         self.pressed = self.hovered_over and any(event.type == pygame.MOUSEBUTTONDOWN for event in events)
 
     def update(self):
-        pass
+        if not self.is_active: return
 
     def draw(self, screen):
-        screen.blit(self.text_renders[self.hovered_over], self.rect)
+        if not self.is_active: return
+        screen.blit(self.current_render, self.rect)
+
+    @property
+    def current_render(self):
+        return self.text_renders[self.hovered_over]
+
+class UIToggleButton(UIButton):
+    def __init__(self, name, text, font, pos, get_value, 
+                 colors=(Color.White, Color.Yellow), toggle_texts=("No", "Yes"), format_t=": {: >16}"):
+        super().__init__(name, text, font, pos, colors)
+        self.get_value = get_value
+        self.toggle_texts = toggle_texts
+        self.format_t = format_t
+        self.text_renders = [[fontutils.get_text_render(self.font, self.text + self.format_t.format(tt), True, color) 
+                              for color in self.colors] for tt in self.toggle_texts]
+        self.rect = pygame.Rect(self.pos, self.text_renders[self.toggle_texts[1] > self.toggle_texts[0]][0].get_size())
+    
+    @property
+    def current_render(self):
+        return self.text_renders[self.get_value()][self.hovered_over]
 
 class UISlider:
-    def __init__(self, rects, length=70, fix=10, ease=easing.ease_in_out_cubic, ins=True):
+    def __init__(self, rects, length=50, fix=10, ease=easing.ease_in_out_cubic, ins=True):
         self.rects, self.length, self.fix, self.ease = rects, length, fix, ease
         self.tick = 0
         self.done = False
@@ -69,7 +92,99 @@ class UISlider:
             rect.x = self.ease(self.tick, *args)
         self.tick += 1
         if self.tick > self.length:
-            self.done = True
+            self.done = True       
+
+
+class Camera:
+    scroll_speed_min = 3
+    scroll_speed_max = 10
+    scroll_speed_acc = 0.05
+    # Base rect coordinates are middle-based
+    def __init__(self, get_pairs, view_cage, view_rect, full_rect, mid=True):
+        self.get_pairs, self.view_cage_rect = get_pairs, view_cage
+        self.view_rect, self.full_rect = view_rect, full_rect
+        self.mid = mid
+        self.middle_fix = (self.view_rect.width // 2, self.view_rect.height // 2)
+        self.scroll_speed = 0
+        self.dragging = self.last_dragging = False
+        self.xbuf, self.ybuf = self.view_rect.topleft
+        self.mouse_pos = self.last_mouse_pos = pygame.mouse.get_pos()
+
+    def handle_moving(self, pressed_keys, mouse_pos, enable_drag):
+        self.dragging = pygame.mouse.get_pressed()[0]
+        ks = (controls.MenuKeys.Left, controls.MenuKeys.Right, 
+              controls.MenuKeys.Up, controls.MenuKeys.Down)
+        ms = enable_drag and self.dragging and self.last_dragging
+        scr = any(pressed_keys[k] for k in ks) or ms
+        if scr:
+            if self.scroll_speed == 0:
+                self.scroll_speed = self.scroll_speed_min
+            else:
+                self.scroll_speed += self.scroll_speed_acc
+                if self.scroll_speed > self.scroll_speed_max:
+                    self.scroll_speed = self.scroll_speed_max
+        if pressed_keys[controls.MenuKeys.Left]:
+            self.xbuf -= self.scroll_speed
+        if pressed_keys[controls.MenuKeys.Right]:
+            self.xbuf += self.scroll_speed
+        if pressed_keys[controls.MenuKeys.Up]:
+            self.ybuf -= self.scroll_speed
+        if pressed_keys[controls.MenuKeys.Down]:
+            self.ybuf += self.scroll_speed
+        if ms:
+            self.xbuf += (self.last_mouse_pos[0] - mouse_pos[0])
+            self.ybuf += (self.last_mouse_pos[1] - mouse_pos[1])
+        if scr:
+            self.view_rect.topleft = (self.xbuf, self.ybuf)
+            if self.mid:
+                self.view_rect.left = max(-self.full_rect.width // 2, self.view_rect.left)
+                self.view_rect.right = min(self.full_rect.width // 2, self.view_rect.right)
+                self.view_rect.top = max(-self.full_rect.height // 2, self.view_rect.top)
+                self.view_rect.bottom = min(self.full_rect.height // 2, self.view_rect.bottom)
+            else:
+                self.view_rect.left = max(0, self.view_rect.left)
+                self.view_rect.right = min(self.full_rect.width, self.view_rect.right)
+                self.view_rect.top = max(0, self.view_rect.top)
+                self.view_rect.bottom = min(self.full_rect.height, self.view_rect.bottom)                
+            self.xbuf, self.ybuf = self.view_rect.topleft
+            r = True
+        else:
+            self.scroll_speed = 0
+            r = False
+        self.last_mouse_pos = mouse_pos
+        self.last_dragging = self.dragging
+        return r
+
+    def draw_in_camera(self, screen, surface, rect):      
+        cage_pos = self.view_cage_rect.topleft
+        if self.is_viewable(rect):
+            if self.is_partly_viewable(rect):
+                norm = rect.move(-cage_pos[0], -cage_pos[1])
+                norm.normalize()
+                norm.x = -norm.x if norm.x < 0 else 0
+                norm.y = -norm.y if norm.y < 0 else 0
+                if rect.right > self.view_cage_rect.right:
+                    norm.width -= rect.right - self.view_cage_rect.right 
+                if rect.bottom > self.view_cage_rect.bottom:
+                    norm.height -= rect.bottom - self.view_cage_rect.bottom
+                rect.move_ip(norm.topleft)
+                screen.blit(surface, rect, norm)
+            else:
+                screen.blit(surface, rect)
+
+    def is_viewable(self, rect):
+        return rect.colliderect(self.view_cage_rect)
+
+    def is_partly_viewable(self, rect):
+        return rect.clamp(self.view_cage_rect) != rect
+
+    def draw(self, screen):
+        vr = self.view_rect
+        get_act = lambda rect: rect.move(-vr.centerx, -vr.centery).move(self.middle_fix).move(self.view_cage_rect.topleft)
+
+        for surface, rect in self.get_pairs():
+            self.draw_in_camera(screen, surface, get_act(rect))
+
 
 def get_parent_surface(game):
     if "screen" in game.vars:
@@ -98,7 +213,7 @@ class MainMenuState(AbstractGameState):
     lazy_state = True
     use_mouse = True
     config = json.loadf("configs/mainmenu.json")
-    fade_length = 50
+    fade_length = 40
     def __init__(self, game, *, fade_in=False, slide_in=True, slide_out=True):
         super().__init__(game)
         self.fade_tick = 0
@@ -113,6 +228,7 @@ class MainMenuState(AbstractGameState):
         self.title_text_rect = pygame.Rect(self.config["positions"]["title_text"], self.title_text.get_size())
 
         self.button_list = [
+            UIButton("continue", "Continue", menu_font, self.config["positions"]["buttons"]["continue"]),
             UIButton("start", "Start", menu_font, self.config["positions"]["buttons"]["start"]),
             UIButton("settings", "Settings", menu_font, self.config["positions"]["buttons"]["settings"]),
             UIButton("exit", "Exit", menu_font, self.config["positions"]["buttons"]["exit"])
@@ -128,6 +244,7 @@ class MainMenuState(AbstractGameState):
         super().resume()
         self.title_text_rect.topleft = self.config["positions"]["title_text"]
         for button in self.button_list:
+            # Reset to original pos after resuming (e.g. returning from higher states)
             button.rect.topleft = button.pos
         if self.slide_in:
             self.set_slide_in()
@@ -138,7 +255,7 @@ class MainMenuState(AbstractGameState):
 
         for event in events:
             if event.type == pygame.KEYDOWN:
-                if event.key in (pygame.K_ESCAPE, pygame.K_RETURN):
+                if event.key == controls.MenuKeys.Leave:
                     if self.fade_in:
                         self.fade_tick = self.fade_length
                     elif self.sliding_in:
@@ -167,7 +284,15 @@ class MainMenuState(AbstractGameState):
                 self.sliding_out = False
                 self.out_slider = None
                 self.after_slide_out()
-        if self.buttons["start"].pressed:
+        # Don't do anything if sliding
+        if self.sliding_in or self.sliding_out:
+            pass
+        elif self.buttons["continue"].pressed:
+            try:
+                self.load_save()
+            except FileNotFoundError:
+                print("Missing save file")
+        elif self.buttons["start"].pressed:
             self.start_game()
         elif self.buttons["settings"].pressed:
             if self.slide_out:
@@ -190,15 +315,6 @@ class MainMenuState(AbstractGameState):
             button.draw(screen)
         menu_border_drawer.draw(screen, TOPLEFT)
 
-    def start_game(self):
-        self.game.reset_game()
-        start_level = self.game.new_game()
-        dungeon_state = DungeonState(self.game, level=start_level(), player=self.game.player)
-        surface = pygame.Surface(self.game.vars["screen_size"])
-        dungeon_state.draw(surface)
-        self.game.push_state(dungeon_state)
-        self.game.push_state(FadeInterludeState(self.game, first=get_parent_surface(self.game), second=surface))
-
     def set_slide_in(self):
         self.sliding_in = True
         rects = [self.title_text_rect] + [b.rect for b in self.button_list]
@@ -208,6 +324,24 @@ class MainMenuState(AbstractGameState):
         self.sliding_out = True
         rects = [self.title_text_rect] + [b.rect for b in self.button_list]
         self.out_slider = UISlider(rects, ins=False)
+
+    def start_game(self):
+        self.game.reset_game()
+        start_level = self.game.new_game()
+        dungeon_state = DungeonState(self.game, level=start_level(), player=self.game.player)
+        surface = dungeon_state.get_as_parent_surface()
+        self.game.push_state(dungeon_state)
+        self.game.push_state(FadeInterludeState(self.game, first=get_parent_surface(self.game), second=surface, tick_length=60))
+
+    def load_save(self, filename="save.json"):
+        with open(filename, "r") as file:
+            save_str = file.read()
+        save = json.loads(save_str)
+        level = self.game.load_save(save)
+        dungeon_state = DungeonState(self.game, player=self.game.player, level=level, repos_player=False)
+        surface = dungeon_state.get_as_parent_surface()
+        self.game.push_state(dungeon_state)
+        self.game.push_state(FadeInterludeState(self.game, first=get_parent_surface(self.game), second=surface, tick_length=60))
 
 # ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 # ===== ===== =====     Settings State      ===== ===== =====
@@ -229,13 +363,10 @@ class SettingsState(AbstractGameState):
         self.no_yes_text = [fontutils.get_text_render(menu_font, t, True, Color.White) for t in ("No", "Yes")]
         self.no_yes_text_pos = [self.config["positions"]["no_or_yes_right_side"] - self.no_yes_text[b].get_width() for b in range(2)]
         self.button_list = [
-            UIButton("use_mouse", "Use Mouse", menu_font, self.config["positions"]["buttons"]["use_mouse"]),
+            UIToggleButton("use_mouse", "Use Mouse", menu_font, self.config["positions"]["buttons"]["use_mouse"], lambda: self.game.vars["forced_mouse"]),
             UIButton("back", "Back", menu_font, self.config["positions"]["buttons"]["back"])
         ]
         self.buttons = {button.name: button for button in self.button_list}
-
-        use_mouse = self.game.vars["forced_mouse"]
-        self.use_mouse_status_rect = pygame.Rect((self.no_yes_text_pos[use_mouse], self.buttons["use_mouse"].rect.y), self.no_yes_text[use_mouse].get_size())
 
         if self.slide_in:
             self.set_slide_in()
@@ -254,14 +385,13 @@ class SettingsState(AbstractGameState):
 
         for event in events:
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_RETURN:
+                if event.key == controls.MenuKeys.Leave:
                     if self.sliding_in:
                         self.in_slider.tick = self.in_slider.length
                     elif self.sliding_out:
                         self.out_slider.tick = self.out_slider.length
 
     def update(self):
-        pygame.mouse.set_visible(True)
         if self.sliding_in:
             self.in_slider.update()
             if self.in_slider.done:
@@ -274,10 +404,10 @@ class SettingsState(AbstractGameState):
                 self.out_slider = None
                 self.after_slide_out()
 
-        if self.buttons["use_mouse"].pressed:
+        if self.sliding_in or self.sliding_out:
+            pass
+        elif self.buttons["use_mouse"].pressed:
             self.game.vars["forced_mouse"] = not self.game.vars["forced_mouse"]
-            use_mouse = self.game.vars["forced_mouse"]
-            self.use_mouse_status_rect = pygame.Rect((self.no_yes_text_pos[use_mouse], self.buttons["use_mouse"].rect.y), self.no_yes_text[use_mouse].get_size())
         elif self.buttons["back"].pressed:
             if self.slide_out:
                 self.set_slide_out()
@@ -288,19 +418,16 @@ class SettingsState(AbstractGameState):
         screen.blit(self.settings_text, self.settings_text_rect)
         for button in self.button_list:
             button.draw(screen)
-            if button.name == "use_mouse":
-                b = self.game.vars["forced_mouse"]
-                screen.blit(self.no_yes_text[b], self.use_mouse_status_rect)
         menu_border_drawer.draw(screen, TOPLEFT)
 
     def set_slide_in(self):
         self.sliding_in = True
-        rects = [self.settings_text_rect, self.use_mouse_status_rect] + [b.rect for b in self.button_list]
+        rects = [self.settings_text_rect] + [b.rect for b in self.button_list]
         self.in_slider = UISlider(rects)
 
     def set_slide_out(self):
         self.sliding_out = True
-        rects = [self.settings_text_rect, self.use_mouse_status_rect] + [b.rect for b in self.button_list]
+        rects = [self.settings_text_rect] + [b.rect for b in self.button_list]
         self.out_slider = UISlider(rects, ins=False)
 
 # ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
@@ -335,9 +462,14 @@ class PauseState(AbstractGameState):
 
         self.button_list = [
             UIButton("return", "Return", self.font, self.config["positions"]["buttons"]["return"]),
+            UIButton("save", "Save", self.font, self.config["positions"]["buttons"]["save"]),
             UIButton("exit", "Exit", self.font, self.config["positions"]["buttons"]["exit"])
         ]
         self.buttons = {button.name: button for button in self.button_list}
+
+        self.save_message_base = fontutils.get_text_render(menu_font, "Saved.", True, Color.Red)
+        self.save_message = self.save_message_base.convert()
+        self.save_message_alpha = 0
 
         self.leaving = False
 
@@ -347,7 +479,7 @@ class PauseState(AbstractGameState):
 
         for event in events:
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
+                if event.key == controls.MenuKeys.Leave:
                     self.leaving = True
 
     def update(self):
@@ -356,8 +488,10 @@ class PauseState(AbstractGameState):
 
         if self.buttons["return"].pressed:
             self.leaving = True
-
-        if self.buttons["exit"].pressed:
+        elif self.buttons["save"].pressed:
+            self.save_game()
+            self.save_message_alpha = 255
+        elif self.buttons["exit"].pressed:
             self.game.pop_state()
             self.cleanup()
             while not isinstance(self.game.top_state, MainMenuState):
@@ -366,7 +500,9 @@ class PauseState(AbstractGameState):
             print("Level caches cleared by PauseState")
             self.game.vars["level_caches"] = {}
             return
-
+        if self.save_message_alpha > 0:
+            self.save_message = imglib.apply_alpha(self.save_message_base, self.save_message_alpha)
+            self.save_message_alpha -= 4
         if self.leaving:    
             self.game.pop_state()
             self.cleanup()
@@ -375,7 +511,14 @@ class PauseState(AbstractGameState):
         screen.blit(self.background, TOPLEFT)
         for button in self.button_list:
             button.draw(screen)
+        if self.save_message_alpha > 0:
+            screen.blit(self.save_message, self.config["positions"]["save_message"])
 
+    def save_game(self, filename="save.json"):        
+        save = self.game.create_save()
+        json_str = json.dumps(save)
+        with open(filename, "w") as file:
+            file.write(json_str)
 
 # ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 # ===== ===== =====      Dungeon State      ===== ===== =====
@@ -386,33 +529,42 @@ class PauseState(AbstractGameState):
 # player will be created.
 
 class DungeonState(AbstractGameState):
+    level_state = True
     config = json.loadf("configs/dungeon.json")
     tile_size = config["tile_size"]
     pos_fix = config["level_surface_position"]
     config_ui = json.loadf("configs/playerui.json")
-    def __init__(self, game, *, level, entry_dir="any", player=None):
+    def __init__(self, game, *, level, entry_dir="any", player=None, repos_player=True):
         super().__init__(game)
+
+        self.player = player
+        self.player.parent_state = self
+        self.player.level = level
 
         self.level = level
         self.level.parent = self
+        self.level.init_level()
 
         self.border_drawer = imglib.ColorBorderDrawer(self.game.vars["screen_size"], 
                                                       self.config["border_color"], 
                                                       self.config["border_thickness"])
 
-        self.player = player
-        self.player.level = self.level
-        if self.level.start_entries[entry_dir] is not None:
-            entry_dir_pos = self.level.start_entries[entry_dir]
-        else:
-            if self.level.start_entries["any"] is not None:
-                entry_dir_pos = self.level.start_entries["any"]
-            else:
-                warnings.warn("DungeonState: Unspecified entry point from " + \
-                              "direction {} at level from {}".format(entry_dir, self.level.source))
-                entry_dir_pos = (0, 0)
+        self.last_draw = False
 
-        self.player.rect.center = self.level.layout[entry_dir_pos[1]][entry_dir_pos[0]].rect.center
+        self.queue_state = None # Set to push a new state (if none other are pushed)
+
+        if repos_player:
+            if self.level.start_entries[entry_dir] is not None:
+                entry_dir_pos = self.level.start_entries[entry_dir]
+            else:
+                if self.level.start_entries["any"] is not None:
+                    entry_dir_pos = self.level.start_entries["any"]
+                else:
+                    warnings.warn("DungeonState: Unspecified entry point from " + \
+                                  "direction {} at level from {}".format(entry_dir, self.level.source))
+                    entry_dir_pos = (0, 0)
+
+            self.player.rect.center = self.level.layout[entry_dir_pos[1]][entry_dir_pos[0]].rect.center
 
         self.player.on_new_level()
         self.level.update()
@@ -426,36 +578,49 @@ class DungeonState(AbstractGameState):
 
     def handle_state_creation_events(self, events, pressed_keys, mouse_pos):
         gets = self.get_as_parent_surface
+        new_state = False
         for event in events:
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
+                if event.key == controls.MenuKeys.Pause:
                     self.game.push_state(PauseState(self.game, parent_surface=gets()))
-                elif event.key == pygame.K_i:
+                    new_state = True; break
+                elif event.key == controls.MenuKeys.PlayerInventory:
                     self.game.push_state(PlayerInventoryState(self.game, parent_surface=gets()))
-                elif event.key == pygame.K_m:
-                    self.game.push_state(MinimapViewState(self.game, parent_surface=gets()))     
+                    new_state = True; break
+                elif event.key == controls.MenuKeys.SpellTree:
+                    self.game.push_state(SpellTreeState(self.game, parent_surface=gets()))  
+                    new_state = True; break
+                elif event.key == controls.MenuKeys.MinimapView:
+                    self.game.push_state(MinimapViewState(self.game, parent_surface=gets()))  
+                    new_state = True; break 
+        if not new_state and self.queue_state:
+            self.game.push_state(self.queue_state)
+            self.queue_state = None
+
 
     def update(self):
         self.level.update()
         self.player.update()
-        if self.player.health_points <= 0:
+        if self.game.vars["enable_death"] and self.player.health_points <= 0:
             self.game.pop_state()
             self.game.push_state(DeathScreenState(self.game, parent_surface=self.get_as_parent_surface()))
             return
         if self.player.going_through_door:
             self.player.going_through_door = False
             self.handle_level_travel()
+        self.game.ticks += 1
 
     def draw(self, screen, *, dlevel=True, dplayer=True, dui=True, dborder=True):
         if dlevel:      
             self.level.draw(screen, self.pos_fix)
-        if dplayer:     
+        if dplayer and not self.last_draw:     
             self.player.draw(screen, self.pos_fix)
         if dui:
             self.player.draw_ui(screen, self.pos_fix)
         if dborder:
             self.border_drawer.draw(screen, TOPLEFT)
-
+        if self.last_draw:
+            self.last_draw = False
 
     def handle_level_travel(self):
         # Through which door is the player going
@@ -468,7 +633,7 @@ class DungeonState(AbstractGameState):
         elif direction == "right":  next_x += 1
         elif direction == "top":    next_y -= 1
         elif direction == "bottom": next_y += 1
-        print((last_x, last_y), "-->", (next_x, next_y), "dir:", direction)
+        print("Player move:", (last_x, last_y), "-->", (next_x, next_y), "(direction:", direction + ")")
         opposite_dir = levels.opposite_dirs[direction]
         self.handle_next_level(last_x, last_y, next_x, next_y, direction, opposite_dir, True)
 
@@ -478,13 +643,14 @@ class DungeonState(AbstractGameState):
         self.game.vars["level_caches"][(last_x, last_y)] = self.level.create_cache()
         self.game.pop_state()
         self.cleanup()
+        self.last_draw = True
         newlevelcls = self.game.vars["map"][next_y][next_x]
         self.game.vars["player_mazepos"] = (next_x, next_y)
         if newlevelcls is None:
             newlevelcls = levels.EmptyLevel
         if (next_x, next_y) in self.game.vars["level_caches"]:
             cache = self.game.vars["level_caches"][(next_x, next_y)]
-            print("Cache: {}".format(cache))
+            print("Next level's cache:\n{}".format(cache))
             newlevelobj = newlevelcls.load_from_cache(cache)
         else:
             cache = None
@@ -512,9 +678,9 @@ class DungeonState(AbstractGameState):
 # ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 
 class DeathScreenState(AbstractGameState):
-    def __init__(self, game):
+    def __init__(self, game, *, parent_surface=None):
         super().__init__(game)
-        self.parent_surface = get_parent_surface(self.game)
+        self.parent_surface = get_parent_surface(self.game) if parent_surface is None else parent_surface
         self.tick = 0
         self.tick_inc = 1
         self.dim = 0
@@ -525,7 +691,7 @@ class DeathScreenState(AbstractGameState):
     def handle_events(self, events, pressed_keys, mouse_pos):
         for event in events:
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_RETURN or event.key == pygame.K_ESCAPE:     
+                if event.key == controls.MenuKeys.Leave:     
                     if self.tick >= self.dim_ease_args[2]:
                         self.game.pop_state()
                     else:
@@ -561,7 +727,7 @@ class DeathScreenState(AbstractGameState):
 
 class InterludeState(AbstractGameState):
     config_dungeon = json.loadf("configs/dungeon.json")
-    def __init__(self, game, *, first, second, way, tick_length=300,
+    def __init__(self, game, *, first, second, way, tick_length=60,
                                 static_elems=[], drawers=[], fix=(0, 0), 
                                 dynamic=False, old_state=None, new_state=None, dynamic_new_surface_delay=3):
         super().__init__(game)
@@ -722,7 +888,7 @@ class FadeInterludeState(AbstractGameState):
 
     def handle_events(self, events, pressed_keys, mouse_pos):
         for event in events:
-            if event.type == pygame.KEYDOWN and event.key in (pygame.K_ESCAPE, pygame.K_RETURN):
+            if event.type == pygame.KEYDOWN and event.key == controls.MenuKeys.Leave:
                 self.tick = self.tick_length
 
     def update(self):
@@ -742,7 +908,7 @@ class FadeInterludeState(AbstractGameState):
 
 class PlayerInventoryState(AbstractGameState):
     lazy_state = True
-    config = json.loadf("configs/player_inventory.json")
+    config = json.loadf("configs/playerinventory.json")
     window_size = config["window_size"]
     window_pos = config["position"]
     slots_start_pos = config["slots_start"]
@@ -750,26 +916,34 @@ class PlayerInventoryState(AbstractGameState):
     slot_size = slot_size_t[0]
     slots_gap = config["slots_gap"]
     slot_border_width = config["slot_border_width"]
-    slot_cols, slot_rows = config["slot_cols"], config["slot_rows"]
+    slot_cols = config["slot_cols"]
     icon_size = slot_size - (2 * slot_border_width)
     icon_size_t = (icon_size, icon_size)
+    container_pos_fix = (0, 2 * slot_size + slots_gap)
+    item_view_icon_pos = config["item_view_icon_pos"]
+    item_view_icon_size = config["item_view_icon_size"]
+    item_view_name_pos = config["item_view_name_pos"]
+    item_view_desc_pos = config["item_view_desc_pos"]
+    font = fontutils.get_font("fonts/AnonymousPro-Regular.ttf", config["item_view_font_size"])
+    font_large = fontutils.get_font("fonts/AnonymousPro-Regular.ttf", config["item_view_font_large_size"])
     bg_tile = imglib.load_image_from_file("images/dd/env/BricksSmall.png", after_scale=(20, 20))
     border_tile = imglib.load_image_from_file("images/dd/env/Wall.png", after_scale=(20, 20))
     slot_img = imglib.load_image_from_file("images/sl/player_inv/Slot.png", after_scale=slot_size_t)
     selected_slot_img = imglib.load_image_from_file("images/sl/player_inv/SelectedSlot.png", after_scale=slot_size_t)
     pointed_slot_img = imglib.load_image_from_file("images/sl/player_inv/PointedSlot.png", after_scale=slot_size_t)
     swapping_slot_img = imglib.load_image_from_file("images/sl/player_inv/SwappingSlot.png", after_scale=slot_size_t)
-    def __init__(self, game, *, parent_surface=None):
+    def __init__(self, game, *, parent_surface=None, container=None):
         super().__init__(game)
 
         self.player = self.game.player
         self.inventory = self.player.inventory
+        self.slot_rows = math.ceil(self.inventory.slots_count / self.slot_cols)
 
         self.surface = current_as_dimmed_bg(game, parent_surface=parent_surface, dim=125)
 
         self.background = imglib.repeated_image_texture(self.bg_tile, self.window_size)
         self.surface.blit(self.background, self.window_pos)
-        self.background_border = imglib.image_border(self.window_size, self.border_tile)
+        self.background_border = imglib.image_border(self.window_size, self.border_tile, nowarn=True)
         self.surface.blit(self.background_border, self.window_pos)
 
         startx, starty = self.slots_start_pos
@@ -779,61 +953,151 @@ class PlayerInventoryState(AbstractGameState):
             y = starty + row * (self.slot_size + self.slots_gap)
             for col in range(self.slot_cols):
                 x = startx + col * (self.slot_size + self.slots_gap)
-                index = x * self.slot_cols + row
                 self.surface.blit(self.slot_img, (x, y))
                 self.slot_positions.append((x, y))
                 xi, yi = x + self.slot_border_width, y + self.slot_border_width
                 self.item_icon_positions.append((xi, yi))
-        if self.player.near_container is not None:
-            self.container = self.player.near_container
-            self.c_slot_positions = []
-            self.c_item_icon_positions = []
-
-        self.pointed = list(divmod(self.player.selected_item_idx, self.slot_cols))[::-1]
+        if container is not None or self.player.near_container is not None:
+            if container is not None:
+                self.container = container
+            elif self.player.near_container is not None:
+                self.container = self.player.near_container
+            self.container.on_open(self.player)
+            self.c_slot_rows = math.ceil(self.container.inventory.slots_count / self.slot_cols)
+            startx, starty = self.slot_positions[0][0], self.slot_positions[-1][1]
+            startx += self.container_pos_fix[0]
+            starty += self.container_pos_fix[1]
+            for row in range(self.c_slot_rows):
+                y = starty + row * (self.slot_size + self.slots_gap)
+                for col in range(self.slot_cols):
+                    x = startx + col * (self.slot_size + self.slots_gap)
+                    self.surface.blit(self.slot_img, (x, y))
+                    self.slot_positions.append((x, y))
+                    xi, yi = x + self.slot_border_width, y + self.slot_border_width
+                    self.item_icon_positions.append((xi, yi))
+            self.container_pointed = False
+        else:
+            self.container = self.container_pointed = None
+            self.c_slot_rows = 0
+        self.arrow_pointed = self.idx_to_pointed(self.player.selected_item_idx)
+        self.pointed = self.arrow_pointed
+        self.mouse_pointed = None
         self.swapping_idx = None
         self.leaving = False
 
     def handle_events(self, events, pressed_keys, mouse_pos):
+        set_select = swap = False
+        # Mouse pointing
+        for i, pos in enumerate(self.slot_positions):
+            rect = pygame.Rect(pos, self.slot_size_t)
+            if rect.collidepoint(mouse_pos):
+                self.mouse_pointed = self.idx_to_pointed(i)
+                break
+        else:
+            width = self.slot_cols * (self.slot_size_t[0] + self.slots_gap)
+            height = self.slot_rows * (self.slot_size_t[1] + self.slots_gap)
+            allrect = pygame.Rect(self.slot_positions[0], (width, height))
+            if not allrect.collidepoint(mouse_pos):
+                self.mouse_pointed = None
         for event in events:
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE or event.key == pygame.K_i:
+                if event.key == controls.MenuKeys.Leave or event.key == controls.MenuKeys.PlayerInventory:
                     self.leaving = True
-                elif event.key == pygame.K_LEFT:
-                    if self.pointed[0] > 0:
-                        self.pointed[0] -= 1
-                elif event.key == pygame.K_RIGHT:
-                    if self.pointed[0] < self.slot_cols - 1:
-                        self.pointed[0] += 1
-                elif event.key == pygame.K_UP:
-                    if self.pointed[1] > 0: 
-                        self.pointed[1] -= 1
-                elif event.key == pygame.K_DOWN:
-                    if self.pointed[1] < self.slot_rows - 1:
-                        self.pointed[1] += 1
-                elif event.key == pygame.K_z:
-                    self.player.selected_item_idx = self.pointed[0] + self.pointed[1] * self.slot_cols  
-                elif event.key == pygame.K_x:
-                    if self.swapping_idx is None:
-                        self.swapping_idx = self.pointed[0] + self.pointed[1] * self.slot_cols
-                    else:
-                        s = self.player.inventory.slots
-                        second_swapping_idx = self.pointed[0] + self.pointed[1] * self.slot_cols
-                        s[self.swapping_idx], s[second_swapping_idx] = s[second_swapping_idx], s[self.swapping_idx]
-                        self.swapping_idx = None
+                elif event.key == controls.MenuKeys.Left:
+                    self.arrow_pointed[0] -= 1
+                elif event.key == controls.MenuKeys.Right:
+                    self.arrow_pointed[0] += 1
+                elif event.key == controls.MenuKeys.Up:
+                    self.arrow_pointed[1] -= 1
+                elif event.key == controls.MenuKeys.Down:
+                    self.arrow_pointed[1] += 1
+                elif event.key == controls.MenuKeys.Action1:
+                    set_select = True
+                elif event.key == controls.MenuKeys.Action2:
+                    swap = True
+            elif self.game.use_mouse and event.type == pygame.MOUSEBUTTONDOWN:
+                if self.mouse_pointed is not None:
+                    if event.button == 1:
+                        set_select = True
+                    elif event.button == 3:
+                        swap = True
+        if self.arrow_pointed[0] < 0:
+            self.arrow_pointed[0] = 0
+        elif self.arrow_pointed[0] > self.slot_cols - 1:
+            self.arrow_pointed[0] = self.slot_cols - 1
+        if self.arrow_pointed[1] < 0:
+            self.arrow_pointed[1] = 0
+        elif self.arrow_pointed[1] > self.slot_rows + self.c_slot_rows - 1:
+            self.arrow_pointed[1] = self.slot_rows + self.c_slot_rows - 1
+        if self.mouse_pointed is None:
+            self.pointed = self.arrow_pointed
+        else:
+            self.pointed = self.mouse_pointed
+        if set_select:        
+            if self.pointed[1] < self.slot_rows:
+                self.player.selected_item_idx = self.pointed_to_idx(self.pointed)
+        if swap:
+            if self.swapping_idx is None:
+                self.swapping_idx = self.pointed.copy()
+            else:
+                inv1, p1 = self.get_inv_idx(self.swapping_idx)
+                inv2, p2 = self.get_inv_idx(self.pointed)
+                i1, i2 = self.pointed_to_idx(p1), self.pointed_to_idx(p2)
+                inv1[i1], inv2[i2] = inv2[i2], inv1[i1]
+                self.swapping_idx = None
+
     def update(self):
         if self.leaving:
             self.game.pop_state()
             self.cleanup()
 
     def draw(self, screen):
-        screen.blit(self.surface, TOPLEFT)        
-        screen.blit(self.pointed_slot_img, self.slot_positions[self.pointed[0] + self.pointed[1] * self.slot_cols])
+        screen.blit(self.surface, TOPLEFT)
+        ppos = self.slot_positions[self.pointed_to_idx(self.pointed)]
+        # Pointing frame
+        screen.blit(self.pointed_slot_img, ppos)
+        # Selection frame
+        spos = self.slot_positions[self.player.selected_item_idx]
+        screen.blit(self.selected_slot_img, spos)
+        # Swap frame
         if self.swapping_idx is not None:
-            screen.blit(self.swapping_slot_img, self.slot_positions[self.swapping_idx])
-        screen.blit(self.selected_slot_img, self.slot_positions[self.player.selected_item_idx])
+            swpos = self.slot_positions[self.pointed_to_idx(self.swapping_idx)]
+            screen.blit(self.swapping_slot_img, swpos)
+        # Player inventory view
         for pos, item in zip(self.item_icon_positions, self.inventory.slots):
             if item is not None and item.icon is not None:
                 screen.blit(imglib.scale(item.icon, self.icon_size_t), pos)
+        # Container inventory view
+        if self.container is not None:
+            for pos, item in zip(self.item_icon_positions[self.player.inventory.slots_count:], self.container.inventory.slots):
+                if item is not None and item.icon is not None:
+                    screen.blit(imglib.scale(item.icon, self.icon_size_t), pos)
+        # Item view
+        item_inventory, item_index = self.get_inv_idx(self.pointed)
+        item = item_inventory[self.pointed_to_idx(item_index)]
+        if item is not None:
+            screen.blit(imglib.scale(item.icon, self.item_view_icon_size), self.item_view_icon_pos)
+            item_name = item.name if item.name is not None else type(item).__name__
+            name_text = fontutils.get_text_render(self.font_large, item_name, True, Color.White)
+            screen.blit(name_text, self.item_view_name_pos)
+            if item.description:
+                lim = 24 if item.custom_word_wrap_chars is None else item.custom_word_wrap_chars
+                desc_text = fontutils.get_multiline_text_render(self.font, item.description, True, Color.White, wordwrap_chars=lim)
+                screen.blit(desc_text, self.item_view_desc_pos)
+    
+    def get_inv_idx(self, pointed):
+        if pointed[1] < self.slot_rows:
+            # Pointer is in player inventory
+            return self.player.inventory.slots, pointed
+        else:
+            # Pointer is in container inventory
+            return self.container.inventory.slots, (pointed[0], pointed[1] - self.slot_rows)
+
+    def pointed_to_idx(self, pointed):
+        return pointed[0] + pointed[1] * self.slot_cols
+
+    def idx_to_pointed(self, idx):
+        return list(divmod(idx, self.slot_cols))[::-1]
 
 # ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 # ===== ===== =====    Minimap View State   ===== ===== =====
@@ -872,59 +1136,37 @@ class MinimapViewState(AbstractGameState):
         if self.scrolling:
             self.view_rect.size = self.view_cage_rect.size
             self.set_view_rect_to_player()
-            self.scroll_speed = 0
-            self.xbuf, self.ybuf = self.view_rect.topleft
             self.ease_tp = False
             self.ease_tp_tick = 0
             self.ease_tp_args_x = self.ease_tp_args_y = None
+            # The camera is used only for moving the view_rect
+            self.camera = Camera(lambda: [(self.view_cage, self.view_cage_rect)], 
+                                 self.view_cage_rect, self.view_rect, self.full_rect, False)
         else:
             self.view_rect.center = self.view_cage_rect.center
             self.view_rect.move_ip(-self.view_cage_rect.x, -self.view_cage_rect.y)
-            self.scroll_speed = self.xbuf = self.ybuf = None
             self.ease_tp = self.ease_tp_tick = self.ease_tp_args_x = self.ease_tp_args_y = None
+            self.camera = None
         self.set_new_view_cage()
 
         self.leaving = False
 
     def handle_events(self, events, pressed_keys, mouse_pos):
-        update_cage = False
+        scrolled = False
         for event in events:
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE or event.key == pygame.K_m:
+                if event.key == controls.MenuKeys.Leave or event.key == controls.MenuKeys.MinimapView:
                     self.leaving = True
-                if self.scrolling and event.key == pygame.K_p:
+                if self.scrolling and event.key == controls.MenuKeys.MinimapView_MoveToPlayer:
                     self.set_ease_to_player()
-                    update_cage = True
+                    scrolled = True
         if self.scrolling:
-            scr = any(pressed_keys[k] for k in (pygame.K_LEFT, pygame.K_RIGHT, pygame.K_UP, pygame.K_DOWN))
-            if scr:
-                if self.ease_tp:
+            scrolled_m = self.camera.handle_moving(pressed_keys, mouse_pos, self.game.use_mouse)
+            scrolled = scrolled or scrolled_m
+            if scrolled:
+                self.set_new_view_cage()
+                if scrolled_m:
                     self.ease_tp = False
-                if self.scroll_speed == 0:
-                    self.scroll_speed = self.scroll_speed_min
-                else:
-                    self.scroll_speed += self.scroll_speed_acc
-                    if self.scroll_speed > self.scroll_speed_max:
-                        self.scroll_speed = self.scroll_speed_max
-            if pressed_keys[pygame.K_LEFT]:
-                self.xbuf -= self.scroll_speed
-            if pressed_keys[pygame.K_RIGHT]:
-                self.xbuf += self.scroll_speed
-            if pressed_keys[pygame.K_UP]:
-                self.ybuf -= self.scroll_speed
-            if pressed_keys[pygame.K_DOWN]:
-                self.ybuf += self.scroll_speed
-            if scr:
-                self.view_rect.topleft = (self.xbuf, self.ybuf)
-                clamped = self.view_rect.clamp(self.full_rect)
-                if self.view_rect != clamped:
-                    self.view_rect = clamped
-                    self.xbuf, self.ybuf = self.view_rect.topleft
-                update_cage = True
-            else:
-                self.scroll_speed = 0
-        if update_cage:
-            self.set_new_view_cage()
 
     def update(self):
         if self.leaving:
@@ -978,3 +1220,121 @@ class MinimapViewState(AbstractGameState):
 
 
 # ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+# ===== ===== =====    Spell Tree State     ===== ===== =====
+# ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+
+class SpellTreeState(AbstractGameState):
+    lazy_state = True
+    config = json.loadf("configs/spelltree.json")
+    crosshair = imglib.load_image_from_file("images/sl/ui/Crosshair.png", after_scale=(5, 5))
+    small_stars = [imglib.scale(imglib.load_image_from_file("images/sl/stars/Star.png"), (i, i)) for i in range(6, 16, 2)]
+    star_count = 800
+    spell_icon_size = (64, 64)
+    def __init__(self, game, *, parent_surface=None):
+        super().__init__(game)
+
+        self.player = self.game.player
+
+        self.screen_size = self.game.vars["screen_size"]        
+        self.full_rect = pygame.Rect((0, 0), self.config["full_size"])
+        self.view_cage_rect = pygame.Rect(self.config["view_pos"], self.config["view_size"])
+        vw, vh = self.config["view_size"]
+        self.view_rect = pygame.Rect(-vw // 2, -vh // 2, vw, vh)
+        if self.player.selected_spell is not None:
+            self.view_rect.center = self.player.selected_spell.tree_pos
+
+        self.crosshair_rect = self.crosshair.get_rect()
+        self.crosshair_rect.center = self.view_cage_rect.center
+        self.use_mouse = False
+
+        self.background = current_as_dimmed_bg(self.game, parent_surface=parent_surface, dim=125)
+        self.border_drawer = imglib.ColorBorderDrawer(self.view_cage_rect.size, self.player.minimap.border_color, 4)
+
+        hfw, hfh = self.full_rect.width, self.full_rect.height
+        self.stars = []
+        for i in range(self.star_count):
+            starrie = random.choice(self.small_stars)
+            rect = starrie.get_rect()
+            rect.center = (random.randint(-hfw // 2, hfw // 2), random.randint(-hfh // 2, hfh // 2))
+            self.stars.append((starrie, rect))
+        
+        self.leaving = False
+
+        self.spell_select = None
+        self.choosing = True
+        self.unlocking = True
+
+        self.camera = Camera(self.get_surface_rect_pairs, self.view_cage_rect, self.view_rect, self.full_rect)
+
+    def handle_events(self, events, pressed_keys, mouse_pos):
+        for event in events:
+            if event.type == pygame.KEYDOWN:
+                if event.key == controls.MenuKeys.Leave or event.key == controls.MenuKeys.SpellTree:
+                    self.leaving = True
+                elif event.key == controls.MenuKeys.Action1:
+                    self.choosing = True
+                elif event.key == controls.MenuKeys.Action2:
+                    self.unlocking = True
+        self.use_mouse = self.game.use_mouse
+        self.camera.handle_moving(pressed_keys, mouse_pos, self.use_mouse)
+        self.pointer = (self.view_rect.centerx, self.view_rect.centery)
+
+    def update(self):
+        if self.leaving:
+            self.game.pop_state()
+        select_candidates = []
+        if self.use_mouse:
+            mx, my = pygame.mouse.get_pos()
+            mx -= self.view_cage_rect.x - self.view_rect.centerx + self.camera.middle_fix[0]
+            my -= self.view_cage_rect.y - self.view_rect.centery + self.camera.middle_fix[1]
+        for spell in spells.register.values():
+            rect = pygame.Rect((0, 0), self.spell_icon_size)
+            cx, cy = spell.tree_pos
+            if self.use_mouse:
+                dist = math.hypot(cx - mx, cy - my)
+            else:
+                dist = math.hypot(cx - self.pointer[0], cy - self.pointer[1])
+            if dist < self.spell_icon_size[0] / 2:
+                select_candidates.append((spell, dist))
+        if select_candidates:
+            select_candidates.sort(key=lambda x: x[1])
+            self.spell_select = select_candidates[0][0]
+        else:
+            self.spell_select = None
+
+        if self.spell_select is not None:
+            unlocked_select = self.spell_select in self.player.unlocked_spells
+            if self.choosing and unlocked_select and type(self.player.selected_spell) is not self.spell_select:
+                print("Choose spell", self.spell_select)
+                self.player.selected_spell = self.spell_select(self.player)
+            elif self.unlocking and not unlocked_select:
+                print("Unlock spell", self.spell_select)
+                self.player.unlocked_spells.append(self.spell_select)
+        self.choosing = self.unlocking = False
+
+    def draw(self, screen):
+        screen.blit(self.background, TOPLEFT)
+        screen.fill(Color.Black, self.view_cage_rect)
+        self.camera.draw(screen)
+        if not self.use_mouse:
+            screen.blit(self.crosshair, self.crosshair_rect)
+        self.border_drawer.draw(screen, self.view_cage_rect.topleft)
+
+    def get_surface_rect_pairs(self):
+        result = []
+        result.extend(self.stars)
+            
+        for spell in spells.register.values():
+            unlocked = spell in self.player.unlocked_spells
+            if spell is type(self.player.selected_spell):
+                icon = spell.icon_circle_select
+            elif spell is self.spell_select:
+                icon = spell.icon_circle_select if unlocked else spell.icon_circle_dim_select
+            else:
+                icon = spell.icon_circle if unlocked else spell.icon_circle_dim
+            icon = imglib.scale(icon, self.spell_icon_size)
+            rect = icon.get_rect()
+            rect.center = spell.tree_pos
+            result.append((icon, rect))
+
+        return result

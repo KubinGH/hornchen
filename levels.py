@@ -1,7 +1,7 @@
 import abc
-from os import listdir
+from os import listdir, path
 import re
-import copy
+from copy import deepcopy
 
 import pygame
 
@@ -11,6 +11,7 @@ from abc_level import AbstractLevel
 import leveltiles
 from colors import Color
 import zipopen
+import utils
 
 if zipopen.enable_resource_zip:
     open = zipopen.open
@@ -34,7 +35,8 @@ tile_size_t = (tile_size, tile_size)
 opposite_dirs = {"left": "right", "right": "left", 
                  "top": "bottom", "bottom": "top"}
 
-all_levels = []
+all_levels = [] #level_creator automatically populates this list
+all_gen_levels = [] # used by the generator, all_levels is for the register
 
 def logic_xnor(first, second):
     return bool(first) is bool(second)
@@ -85,22 +87,35 @@ def load_level_data_from_file(filename, is_special=False):
 
 class BaseLevel(AbstractLevel):
     start_entries = default_start_entries
-    def __init__(self):
-        super().__init__()
-        self.background = imglib.repeated_image_texture(self.bg_tile, level_surface_size)
-        self.current_render = pygame.Surface(level_surface_size).convert()
-        self.force_full_update = True
-        self.force_render_update = True
-        self.transparency_map = self.create_transparency_map() # passability for collisions
-        # used if you want to save something into the cache before level deletion
+    def __init__(self, manual_init=True):
+        # Used if you want to save something into the cache before level deletion
         self.precache = {
             "sprites": [],
             "uncovered": [],
             "tiles": []
         }
-        # This is should be set by the state that handles this level, and 
+        self.initialized = False
+        # 'parent' should be set by the state that handles this level, and 
         # has a 'player' and 'game' attribute
         self.parent = None
+        self.force_full_update = self.force_render_update = False
+        self.transparency_map = None
+        self.cache_to_load = None # set by load_from_cache
+        if not manual_init:
+            self.init_level()
+        self.background = imglib.repeated_image_texture(self.bg_tile, level_surface_size)
+        self.current_render = pygame.Surface(level_surface_size).convert()
+        self.redrawn = set()
+
+    def init_level(self):
+        if not self.initialized:
+            super().__init__()
+            self.force_full_update = True
+            self.force_render_update = True
+            self.transparency_map = self.create_transparency_map() # passability for collisions
+            if self.cache_to_load is not None:
+                self.load_cache(self.cache_to_load)
+            self.initialized = True
 
     def get_layout_copy(self):
         return leveltiles.parse_layout(self.raw_layout, self)
@@ -118,7 +133,7 @@ class BaseLevel(AbstractLevel):
         return len(self.layout)
 
     def create_cache(self):
-        cache = self.precache
+        cache = deepcopy(self.precache)
         cache["last_tick"] = self.parent.game.ticks
         cache["sprites"].extend(sprite.create_cache() for sprite in self.sprites if sprite.cachable)
         for row, tilerow in enumerate(self.layout):
@@ -128,28 +143,36 @@ class BaseLevel(AbstractLevel):
         return cache
 
     @classmethod
-    def load_from_cache(cls, cache):
-        obj = cls()
+    def load_from_cache(cls, cache, manual_init=True):
+        obj = cls(True)
+        obj.cache_to_load = cache
+        if not manual_init:
+            obj.init_level()
+        else:
+            # The actual loading is done in init_level->load_cache
+            pass
+        return obj
+
+    def load_cache(self, cache):        
         for sprite_cache in cache["sprites"]:
             if sprite_cache["type"] == "enemy":
                 scol, srow = sprite_cache["levelpos"][0], sprite_cache["levelpos"][1]
-                spawner_tile = obj.layout[srow][scol]
-                sprite = sprite_cache["cls"].from_cache(obj, spawner_tile, sprite_cache)
-                obj.sprites.append(sprite)
+                spawner_tile = self.layout[srow][scol]
+                sprite = sprite_cache["cls"].from_cache(self, spawner_tile, sprite_cache)
+                self.sprites.append(sprite)
             elif sprite_cache["type"] == "item":
-                obj.sprites.append(sprite_cache["cls"].from_cache(obj, sprite_cache))
+                self.sprites.append(sprite_cache["cls"].from_cache(self, sprite_cache))
         for col, row in cache["uncovered"]:
-            tile = obj.layout[row][col]
+            tile = self.layout[row][col]
             if tile.flags.PartOfHiddenRoom:
                 tile.uncover()
         for tile_cache in cache["tiles"]:
             col, row = tile_cache["col"], tile_cache["row"]
-            tile = obj.layout[row][col]
+            tile = self.layout[row][col]
             # Because the layout is already created,
             # the tiles are mutated in order to load the cache.
             # (As opposed to creating a new instance from the cache)
             tile.load_cache(tile_cache)
-        return obj
 
     def stop(self):
         return self.create_cache()
@@ -168,6 +191,7 @@ class BaseLevel(AbstractLevel):
         self.update_render()
 
     def update(self):
+        self.redrawn.clear()
         if self.force_full_update:
             self.update_full()
             self.force_full_update = False
@@ -185,15 +209,18 @@ class BaseLevel(AbstractLevel):
     def handle_events(self, events, pressed_keys, mouse_pos):
         pass
 
-    def draw(self, screen, fix=TOPLEFT):
+    def draw(self, screen, pos_fix=TOPLEFT):
         if self.force_render_update:
             self.update_render()
             self.force_render_update = False
-        screen.blit(self.current_render, fix)
+        screen.blit(self.current_render, pos_fix)
         for sprite in self.sprites:
-            sprite.draw(screen, fix)
+            sprite.draw(screen, pos_fix)
         for particle in self.particles:
-            particle.draw(screen, fix)
+            particle.draw(screen, pos_fix)
+        for col, row in self.redrawn:
+            tile = self.layout[row][col]
+            screen.blit(tile.surface, tile.rect.move(pos_fix))
 
 # ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 # ===== ===== =====      Level Factory      ===== ===== =====
@@ -216,6 +243,10 @@ def level_creator(filename, expected_special=False):
         for k, v in start_entries.items():
             if v is not None:
                 passages.append(k)
+    base = path.basename(filename)
+    actname = path.splitext(base)[0]
+    GenericLevel.__name__ = "GenericLevel_" + actname
+    all_levels.append(GenericLevel)
     return GenericLevel
 
 
@@ -241,7 +272,7 @@ for file in sorted(listdir("levels")):
             print("{}: {}".format(type(e).__name__, str(e)))
     else:
         print("{}; ".format(file), end="")
-        all_levels.append(level)
+        all_gen_levels.append(level)
 print("\nDone loading levels")
 
 # A dictionary of all of the levels, with the keys being from which sides the doors
@@ -267,7 +298,10 @@ leveldict = {
     0b1111: []
 }
 
-for level in all_levels:
+for level in all_gen_levels:
     key = bool(level.start_entries["bottom"]) * 1 + bool(level.start_entries["top"]) * 2 + \
           bool(level.start_entries["right"]) * 4 + bool(level.start_entries["left"]) * 8
     leveldict[key].append(level)
+
+
+register = utils.Register.from_sequence(all_levels, "BaseLevel")

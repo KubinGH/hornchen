@@ -4,6 +4,7 @@ import pygame
 
 import json_ext as json
 import spriteutils
+import utils
 
 print("Load base sprite")
 
@@ -22,13 +23,14 @@ def _clamp(number, minim, maxim):
     else:
         return number
 
-class BaseSprite(pygame.sprite.Sprite):
+class BaseSprite:
+    # TODO: Create Entity base class and remove Entity code in BaseSprite (e.g. health_points, status_effects)
+    is_entity = False
     cachable = True
     hostile = False
     friendly = False
-    # Used by spriteutils.get_tiles_next_to
-    next_to_cache = {}
     surface = None
+    noclip = False
     move_speed = 0
     def __init__(self):
         super().__init__()
@@ -36,6 +38,9 @@ class BaseSprite(pygame.sprite.Sprite):
         self.rect = None
         self.level = None
         self.moving = {"left": False, "right": False, "up": False, "down": False}
+        self.is_overdrawn = False
+        self.last_attacked_sprite = None
+        self.surface_default = self.surface
 
     def __hash__(self):
         return hash(self._id)
@@ -44,21 +49,21 @@ class BaseSprite(pygame.sprite.Sprite):
         pass
         
     def draw(self, screen, pos_fix=(0, 0)):
-        screen.blit(self.surface, self.rect.move(pos_fix[0], pos_fix[1]))
-        nearby = self.get_tiles_next_to()
-        col, row = self.closest_tile_index
-        if 0 <= col < level_size[0] and 0 <= row < level_size[1]:
-            nearby.append(self.closest_tile_index)
+        screen.blit(self.surface, self.rect.move(pos_fix))
+        nearby = self.get_tiles_next_to() + [self.closest_tile_index]
+        self.is_overdrawn = False
         for col, row in nearby:
             tile = self.level.layout[row][col]
-            if tile.passable and not tile.transparent and tile.flags.PartOfHiddenRoom and \
-               self.rect.colliderect(tile.rect):
-                screen.blit(tile.surface, tile.rect.move(pos_fix[0], pos_fix[1]))
+            if not tile.transparent and self.rect.colliderect(tile.rect) and \
+               (col, row) not in self.level.redrawn:
+                self.level.redrawn.add((col, row))
+                self.is_overdrawn = True
 
     def handle_moving(self):
         row, col = self.closest_tile_index
-        self.rect = spriteutils.move_in_level(self.level.layout, self.moving, col, row, 
-                                              self.rect, self.move_speed, screen_rect)
+        args = (self.level.layout, self.moving, col, row, 
+                self.rect, self.move_speed, screen_rect, self.noclip)
+        self.rect, self.collides = spriteutils.move_in_level(*args)
 
     @property
     def closest_tile_index(self):
@@ -71,8 +76,7 @@ class BaseSprite(pygame.sprite.Sprite):
         return int(col), int(row) 
 
     def get_tiles_next_to(self):
-        return [(col, row) for col, row in spriteutils.get_tiles_next_to(self) 
-                if 0 <= col < level_size[0] and 0 <= row < level_size[1]]
+        return spriteutils.get_tiles_next_to(self) 
 
     @property
     def inside_level(self):
@@ -88,11 +92,30 @@ class BaseSprite(pygame.sprite.Sprite):
                 return True
         return False
 
+    def take_damage(self, value):
+        self.health_points -= value
+        if self.health_points > self.max_health_points:
+            self.health_points = self.max_health_points
+
+    def deal_damage(self, sprite):
+        sprite.take_damage(self.damage)
+        self.last_attacked_sprite = sprite
+
     def simple_deal_damage(self, once=True):
-        it = self.level.hostile_sprites if self.friendly else self.level.friendly_sprites if self.hostile else []
-        for sprite in it:
-            if self.rect.colliderect(sprite.rect):
-                sprite.take_damage(self.damage)
+        for sprite in self.get_local_enemy_sprites():
+            if sprite.is_entity and self.rect.colliderect(sprite.rect):
+                self.deal_damage(sprite)
                 if once:
                     return True
         return False
+
+    @staticmethod
+    def get_enemy_sprites_as(friendly, hostile, level):
+        result = level.hostile_sprites if friendly else level.friendly_sprites if hostile else []
+        result = [s for s in result if s.is_entity]
+        if level.parent is not None and hostile:
+            result.append(level.parent.player)
+        return result
+
+    def get_local_enemy_sprites(self):
+        return self.get_enemy_sprites_as(self.friendly, self.hostile, self.level)

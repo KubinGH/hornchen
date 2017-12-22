@@ -2,6 +2,7 @@ import random
 
 import pygame
 
+from basesprite import BaseSprite
 import imglib
 import utils
 import easing
@@ -13,19 +14,25 @@ _summer = easing.ease_value_sum_fm
 # Speedup - start 0, end maximum (use with ease in-out or in)
 _summer2 = easing.ease_value_sum
 
-class Particle:
+class Particle(BaseSprite):
     def __init__(self, level, origin, size, 
                  maxvel_or_dist, length, color, *, angle=0, rotvel=0,
-                 ease=easing.ease_quintic_out, from_dist=False):
+                 ease=easing.ease_quintic_out, from_dist=False,
+                 length_disperse=0.3):
         self.level = level
         self.origin, self.size = origin, size
+        if length_disperse > 0:
+            length *= 1 + random.uniform(-length_disperse, length_disperse)
+            length = round(length)
+            if length == 0: length = 1
         self.length = length
         self.color, self.angle, self.rotvel = color, angle, rotvel
         self.ease = ease
         self.time = 0
         self.last_angle = angle
         self.last_size = size
-        self.rect = pygame.Rect(0, 0, self.size, self.size); self.rect.center = self.origin
+        self.rect = pygame.Rect(0, 0, self.size, self.size)
+        self.rect.center = self.origin
         if not from_dist:
             self.maxvel = maxvel_or_dist
             self.ease_args_x_fv = (0, self.maxvel.x, self.length)
@@ -68,4 +75,10 @@ class Particle:
         self.rect.center = (x, y)
 
     def draw(self, screen, pos_fix=(0, 0)):
-        screen.fill(self.color, self.rect.move(pos_fix))
+        screen.fill(self.color, self.rect.move(pos_fix))        
+        nearby = self.get_tiles_next_to() + [self.closest_tile_index]
+        for col, row in nearby:
+            tile = self.level.layout[row][col]
+            if not tile.transparent and self.rect.colliderect(tile.rect) and \
+               (col, row) not in self.level.redrawn:
+                self.level.redrawn.add((col, row))

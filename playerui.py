@@ -32,6 +32,7 @@ class MinimapWidget(AbstractUIWidget):
         self.tile_current = self.new_tile_current_surface()
 
     def update_full(self):
+        # Redraw the entire minimap surface
         self.full_surface.fill(Color.Black)
         self.full_surface.blit(self.background, (0, 0))
         mazepos = self.game.vars["player_mazepos"]
@@ -48,6 +49,7 @@ class MinimapWidget(AbstractUIWidget):
                 self.full_surface.blit(tile, rect)
 
     def update_part(self):
+        # Redraw the needed part of the entire minimap surface to the display UI element
         mazepos = self.game.vars["player_mazepos"]
         mtopleftidx = tuple((self.minimap_tiles[i] - 1)/2 - mazepos[i] for i in range(2))
         mtopleft = mtopleftidx[0] * self.minimap_tile, mtopleftidx[1] * self.minimap_tile
@@ -89,18 +91,15 @@ class HeartsWidget(AbstractUIWidget):
         super().__init__(game, player)
         self.heart_draws = []
         self.top_heart = None
+        self.hearts_gap_default = self.hearts_gap
         self.update_hearts()
 
     def update(self):
         if self.player.last_health_points != self.player.health_points or \
           bool(self.player.last_invincibility_ticks) != bool(self.player.invincibility_ticks) or \
           math.ceil(self.player.max_health_points) != len(self.heart_draws):
+           self.hearts_gap = self.hearts_gap_default
            self.update_hearts()
-
-
-    def get_hp_half_round(self):
-        check = self.player.health_points * 2
-        return int(check) / 2 if check % 1 else self.player.health_points
 
     def update_hearts(self):
         self.heart_draws.clear()
@@ -109,22 +108,31 @@ class HeartsWidget(AbstractUIWidget):
         heart_img = self.heartinv_img if invincible else self.heart_img
         halfheart_img = self.halfheartinv_img if invincible else self.halfheart_img
         emptyheart_img = self.emptyheart_img
-        rhealth = self.get_hp_half_round()
+        health = self.player.health_points
+        hearts = math.ceil(self.player.max_health_points)
         rect = pygame.Rect(self.hearts_pos, self.heart_size)
+        inside_fix = 10
         gap = self.hearts_gap
         drawn = 0
-        if rhealth > 0:
-            for h in range(math.floor(rhealth)):
+        # Distribute the hearts as needed
+        if health > 0:
+            for h in range(math.floor(health)):
                 self.heart_draws.append((heart_img, rect.copy()))
                 drawn += 1
                 rect.x += self.heart_size[0] + gap
                 self.top_heart = drawn - 1
-            if rhealth % 1 == 0.5:
-                self.heart_draws.append((halfheart_img, rect.copy()))
+            if health % 1:
+                surface = emptyheart_img.copy()
+                width = inside_fix/2 + round((rect.width-inside_fix) * (health%1))
+                if width == rect.width - inside_fix/2:
+                    width = rect.width
+                area = pygame.Rect(0, 0, width, rect.height)
+                surface.blit(heart_img, (0, 0), area)
+                self.heart_draws.append((surface, rect.copy()))
                 drawn += 1
                 rect.x += self.heart_size[0] + gap
                 self.top_heart = drawn - 1
-            for h in range(math.ceil(self.player.max_health_points) - drawn):
+            for h in range(hearts - drawn):
                 self.heart_draws.append((emptyheart_img, rect.copy()))
                 drawn += 1
                 rect.x += self.heart_size[0] + gap
@@ -138,7 +146,6 @@ class HeartsWidget(AbstractUIWidget):
             self.update_hearts()
 
     def draw(self, screen):
-        #screen.blit(self.heart_surface, config_ui["hearts_pos"])
         for i, pair in enumerate(self.heart_draws):
             if i == self.top_heart:
                 continue
@@ -156,12 +163,13 @@ class StarsWidget(AbstractUIWidget):
     star_img = imglib.load_image_from_file("images/sl/stars/Star.png", after_scale=star_size)
     main_r, main_g, main_b = star_main_color
     star_images = []
+    lowest_alpha = 200
     _get_trans_color = lambda v, fr, m=255: v + (m - v) * fr
     for i in range(mana_per_star + 1):
         star_array = pygame.PixelArray(star_img.copy())
         _fr = 1 - (i / mana_per_star)
         if _fr > 0:
-            repcolor = (_get_trans_color(main_r, _fr, 160), _get_trans_color(main_g, _fr, 160), _get_trans_color(main_b, _fr))
+            repcolor = (_get_trans_color(main_r, _fr, lowest_alpha), _get_trans_color(main_g, _fr, lowest_alpha), _get_trans_color(main_b, _fr))
             star_array.replace(star_main_color, repcolor, 0.4)
         star_images.append(star_array.surface)
         del star_array
@@ -169,11 +177,13 @@ class StarsWidget(AbstractUIWidget):
         super().__init__(game, player)
         self.star_draws = []
         self.top_star = None
+        self.stars_gap_default = self.stars_gap
         self.update_stars()
 
     def update(self):
         if self.player.last_mana_points != self.player.mana_points or \
            math.ceil(self.player.max_mana_points / self.mana_per_star) != len(self.star_draws):
+            self.stars_gap = self.stars_gap_default
             self.update_stars()
 
     def update_stars(self):
@@ -187,16 +197,15 @@ class StarsWidget(AbstractUIWidget):
             rect.x += self.star_size[0] + self.stars_gap
             drawn += 1
             self.top_star = drawn - 1
-        if drawn == count:
-            return
-        self.star_draws.append((self.star_images[self.player.mana_points % 20], rect.copy()))
-        rect.x += self.star_size[0] + self.stars_gap
-        drawn += 1
-        self.top_star = drawn - 1
-        while drawn != count:
-            self.star_draws.append((self.star_images[0], rect.copy()))
+        if drawn != count:
+            self.star_draws.append((self.star_images[self.player.mana_points % 20], rect.copy()))
             rect.x += self.star_size[0] + self.stars_gap
             drawn += 1
+            self.top_star = drawn - 1
+            while drawn != count:
+                self.star_draws.append((self.star_images[0], rect.copy()))
+                rect.x += self.star_size[0] + self.stars_gap
+                drawn += 1
         if rect.x > 500 and self.stars_gap > -self.star_size[0]:
             self.stars_gap -= 1
             self.update_stars()
@@ -220,16 +229,18 @@ class SelectedItemBoxWidget(AbstractUIWidget):
     def __init__(self, game, player):
         super().__init__(game, player)
         self.display_icon = self.last_selected = self.last_icon = None
+        self.force_update = False
         self.update()
 
     def update(self):
         select = self.player.selected_item
-        if select is not self.last_selected:
+        if select is not self.last_selected or self.force_update:
             self.last_selected = select
-            if select is not self.player.inventory.empty_slot:
-                self.display_icon = imglib.scale(select.icon, self.icon_size, docache=False)
+            if select is not None:
+                self.display_icon = imglib.scale(select.icon, self.icon_size)
             else:
                 self.display_icon = None
+            self.force_update = False
 
     def draw(self, screen):
         screen.blit(self.box_image, self.box_pos)

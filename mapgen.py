@@ -5,7 +5,6 @@ print("Load map generator")
 
 def generate_map(dest, maze_gen):
     maze = maze_gen.data
-    maze_gen.pprint()
     for row, irow in enumerate(maze):
         for col, tile in enumerate(irow):
             if tile: continue

@@ -2,6 +2,7 @@
     "positions": {
         "title_text": [40, 100],
         "buttons": {
+            "continue": [70, 320],
             "start": [70, 390],
             "settings": [70, 440],
             "exit": [60, 700]

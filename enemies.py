@@ -7,6 +7,10 @@ import json_ext as json
 from colors import Color
 from basesprite import BaseSprite
 import playeritems # Drops
+import utils
+import projectiles
+import statuseffects
+import pathfinding
 
 print("Load enemies")
 
@@ -16,7 +20,9 @@ def percent_chance(percent):
     return random.randint(1, 100) <= percent
 
 class BaseEnemy(BaseSprite):
+    is_entity = True
     hostile = True
+    friendly = False
     hp_bar_gap = 4
     hp_bar_size = (32, 2)
     base_move_speed = 0
@@ -32,13 +38,15 @@ class BaseEnemy(BaseSprite):
         self.move_speed = self.damage = self.max_health_points = None
         self.reset_attributes()
         self.health_points = self.max_health_points
+        self.status_effects = statuseffects.StatusEffects(self, lambda: self.level.parent.game.ticks)
 
     def __repr__(self):
         return "<{} @ {}>".format(type(self).__name__, self.rect.topleft)
 
     def update(self):
-        self.reset_attributes()
         player = self.level.parent.player
+        self.reset_attributes()
+        self.status_effects.update()
         if self.damage_on_player_touch and player is not None:
             if self.rect.colliderect(player.rect):
                 player.take_damage(self.damage)
@@ -47,30 +55,23 @@ class BaseEnemy(BaseSprite):
             self.on_death()
 
     def draw(self, screen, pos_fix=(0, 0)):
-        enable_hp_bar = self.level.parent.game.vars["enable_enemy_hp_bars"]
-        if enable_hp_bar:
-            nearby = self.get_tiles_next_to() + [self.closest_tile_index]
-            show_bar = False
-            if self.health_points < self.max_health_points:
-                for col, row in nearby:
-                    tile = self.level.layout[row][col]
-                    if tile.passable and tile.flags.PartOfHiddenRoom and not tile.uncovered:
-                        break
-                else:
-                    show_bar = True
-            if show_bar:
-                pos = self.hp_bar_rect.topleft
-                if self.dead:
-                    screen.fill(Color.Red, self.hp_bar_rect.move(pos_fix))
-                else:
-                    px_healthy = min(round(self.health_points / self.max_health_points * self.hp_bar_size[0]), self.hp_bar_size[0])
-                    px_damaged = self.hp_bar_size[0] - px_healthy
-                    healthy_rect = pygame.Rect(pos, (px_healthy, self.hp_bar_size[1]))
-                    screen.fill(Color.Green, healthy_rect.move(pos_fix))
-                    if px_damaged:
-                        damaged_rect = pygame.Rect((pos[0] + px_healthy, pos[1]), (px_damaged, self.hp_bar_size[1]))
-                        screen.fill(Color.Red, damaged_rect.move(pos_fix))
         super().draw(screen, pos_fix)
+        self.draw_hp_bar(screen, pos_fix)
+
+    def draw_hp_bar(self, screen, pos_fix=(0, 0)):
+        nearby = self.get_tiles_next_to() + [self.closest_tile_index]
+        if self.health_points < self.max_health_points and not self.is_overdrawn:
+            pos = self.hp_bar_rect.topleft
+            if self.dead:
+                screen.fill(Color.Red, self.hp_bar_rect.move(pos_fix))
+            else:
+                px_healthy = min(round(self.health_points / self.max_health_points * self.hp_bar_size[0]), self.hp_bar_size[0])
+                px_damaged = self.hp_bar_size[0] - px_healthy
+                healthy_rect = pygame.Rect(pos, (px_healthy, self.hp_bar_size[1]))
+                screen.fill(Color.Green, healthy_rect.move(pos_fix))
+                if px_damaged:
+                    damaged_rect = pygame.Rect((pos[0] + px_healthy, pos[1]), (px_damaged, self.hp_bar_size[1]))
+                    screen.fill(Color.Red, damaged_rect.move(pos_fix))
 
     def reset_attributes(self):
         self.move_speed = self.base_move_speed
@@ -86,22 +87,19 @@ class BaseEnemy(BaseSprite):
         return {
             "type": "enemy",
             "cls": type(self),
-            "rect": self.rect,
+            "pos": self.rect.topleft,
             "levelpos": (self.spawner_tile.col_idx, self.spawner_tile.row_idx),
-            "health_points": self.health_points
+            "health_points": self.health_points,
+            "status_effects": self.status_effects.create_cache()
         }
 
     @classmethod
     def from_cache(cls, level, spawner_tile, cache):
         obj = cls(level, spawner_tile)
-        obj.rect = cache["rect"]
+        obj.rect.topleft = cache["pos"]
         obj.health_points = cache["health_points"]
+        obj.status_effects.load_cache(cache["status_effects"])
         return obj
-
-    def take_damage(self, value):
-        self.health_points -= value
-        if self.health_points > self.max_health_points:
-            self.health_points = self.max_health_points
 
     def on_death(self):
         self.level.sprites.remove(self)
@@ -121,7 +119,7 @@ class BaseEnemy(BaseSprite):
         return self.health_points <= 0
 
 class GrayGoo(BaseEnemy):
-    base_move_speed = 1
+    base_move_speed = 2
     base_damage = 0.5
     base_max_health_points = 1
     damage_on_player_touch = True
@@ -156,6 +154,8 @@ class GrayGoo(BaseEnemy):
             possible_directions.append("up")
         if row < level_size[1] - 1 and self.level.layout[row + 1][col].passable:
             possible_directions.append("down")
+        if not possible_directions:
+            possible_directions = ["left", "right", "up", "down"]
         self.direction = random.choice(possible_directions)
 
     def create_cache(self):
@@ -171,14 +171,65 @@ class GrayGoo(BaseEnemy):
         obj.direction = cache["direction"]
         return obj
 
-
-class Warlock(BaseEnemy):
-    move_speed = 1
-    damage = 0.5
-    max_health_points = 2
+class SkeletonArcher(BaseEnemy):
+    base_move_speed = 1
+    base_damage = 0.1
+    base_max_health_points = 1.5
     damage_on_player_touch = True
     size = (30, 30)
-    surface = imglib.load_image_from_file("images/dd/enemies/Warlock.png", after_scale=size)
+    surface = imglib.load_image_from_file("images/sl/enemies/SkeletonArcher.png", after_scale=size)
+    shot_cooldown = 70
     def __init__(self, level, spawner_tile):
         super().__init__(level, spawner_tile)
-        
+        self.next_shot = self.shot_cooldown
+        self.last_rect = None
+        self.path_obstructed = False
+        self.moving = {k: False for k in base_directions}
+        self.last_path_target = None
+        self.path_to_player = []
+        self.current_target = None
+
+
+    def update(self):
+        super().update()
+        player = self.level.parent.player
+        for p in pathfinding.get_sprite_path_npoints(self, player):
+            if not self.level.layout[p[1]][p[0]].passable:
+                self.path_obstructed = True
+                self.moving = {k: False for k in base_directions}
+                break
+        else:
+            self.path_obstructed = False
+            self.moving = False
+            self.path_to_player = []
+            self.current_target = None
+        if self.next_shot <= 0 and not self.path_obstructed:
+            p = projectiles.Arrow.towards(self.level, self.rect.center, player.rect.center)
+            self.level.sprites.append(p)
+            self.next_shot = self.shot_cooldown * (self.base_move_speed / self.move_speed)
+        self.next_shot -= 1
+        cpoint = self.closest_tile_index
+        p1, p2 = cpoint, player.closest_tile_index
+        if self.path_obstructed and self.last_path_target != p2:
+            self.last_path_target = p2
+            self.path_to_player = pathfinding.a_star_in_level(p1, p2, self.level.layout)
+        if self.path_to_player:
+            while self.current_target is None or self.current_target == self.rect.center:
+                p = self.path_to_player.pop()
+                self.current_target = self.level.layout[p[1]][p[0]].rect.center
+            t, c = self.current_target, self.rect.center
+            d1, d2 = utils.sign(t[0] - c[0]), utils.sign(t[1] - c[1])
+            if d1 == -1:
+                self.moving["left"] = True
+            elif d1 == 1:
+                self.moving["right"] = True
+            if d2 == -1:
+                self.moving["up"] = True
+            elif d2 == 1:
+                self.moving["down"] = True
+            self.handle_moving()
+
+
+
+
+register = utils.Register.gather_type(BaseEnemy, locals())

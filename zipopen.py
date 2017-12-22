@@ -8,19 +8,23 @@ resource_zip_filename = "resources.zip"
 archive = None
 c_open = open
 
-if enable_resource_zip and resource_zip_filename in listdir():
+zip_present = resource_zip_filename in listdir()
+if enable_resource_zip and not zip_present:
+    print("[WARNING] Couldn't find the resources archive!")
+if enable_resource_zip and zip_present:
     print("Load resource zip hook")
     archive = zipfile.ZipFile(resource_zip_filename, "r")
     def open(filename, mode="r"):
-        # The mode is muted, since we only read from the archive
         try:
+            # First, try to get the file from the archive
             content = archive.read(filename)
         except KeyError:
+            # If it's not there, use plain open from working directory
             try:
                 with c_open(filename, mode) as file:
                     content = file.read()
             except FileNotFoundError:
-                raise FileNotFoundError("[zipopen] The file {} was not ".format(filename) + \
+                raise FileNotFoundError("[zipopen] The file '{}' was not ".format(filename) + \
                                         "found in the archive nor the app directory")
         if mode == "r":
             # If the file was loaded locally, don't decode it

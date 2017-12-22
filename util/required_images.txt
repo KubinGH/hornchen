@@ -1,8 +1,14 @@
 ..\enemies.py
-['images/dd/enemies/GrayGoo.png']
+['images/dd/enemies/GrayGoo.png', 'images/dd/enemies/Warlock.png']
 ..\leveltiles.py
 ['images/dd/env/Wall.png', 'images/dd/env/DoorOnWall.png', 'images/dd/env/Wall.png', 'images/dd/env/DoorOnWall.png']
+..\playeritems.py
+['images/sl/items/icons/SwordI.png', 'images/sl/items/Sword.png', 'images/sl/items/icons/EnchantedSwordI.png', 'images/sl/items/EnchantedSword.png', 'images/sl/items/icons/FireballStaff.png']
 ..\playerui.py
-['images/sl/minimap/QuestionMarkM.png', 'images/dd/env/Bricks.png', 'images/dd/env/WallSmall.png', 'images/sl/hearts/Full.png', 'images/sl/hearts/Half.png', 'images/sl/hearts/Empty.png', 'images/sl/hearts/FullInv.png', 'images/sl/hearts/HalfInv.png']
+['images/sl/minimap/QuestionMarkM.png', 'images/dd/env/Bricks.png', 'images/dd/env/WallSmall.png', 'images/sl/hearts/Full.png', 'images/sl/hearts/Half.png', 'images/sl/hearts/Empty.png', 'images/sl/hearts/FullInv.png', 'images/sl/hearts/HalfInv.png', 'images/sl/ui/SelectedItemBox.png', 'images/sl/ui/SelectedSpellBox.png']
+..\projectiles.py
+['images/sl/projectiles/EtherealSword.png', 'images/sl/projectiles/Fireball.png']
+..\spells.py
+['images/pt/fire-arrows-2.png']
 ..\states.py
-['images/tr/LogoSword.png', 'images/dd/env/Bricks.png', 'images/dd/env/BricksSmall.png', 'images/dd/env/WallDim.png']
+['images/dd/env/Bricks.png', 'images/dd/env/BricksSmall.png', 'images/dd/env/WallDim.png', 'images/dd/env/BricksSmall.png', 'images/dd/env/Wall.png', 'images/sl/player_inv/Slot.png', 'images/sl/player_inv/SelectedSlot.png', 'images/sl/player_inv/PointedSlot.png', 'images/sl/player_inv/SwappingSlot.png']

@@ -4,9 +4,13 @@ import pygame
 print("Load abstract base class of state")
 
 class AbstractGameState(metaclass=abc.ABCMeta):
-    # laziness makes the state force 60 fps limit, so that it doesn't
+    # laziness makes the state force 60 FPS limit, so that it doesn't
     # overuse the CPU doing literally nothing
+    # doesn't do anything when the FPS limit is on
     lazy_state = False
+    # e.g. DungeonState has this set to True, 
+    # all states that are a parent of a level should too
+    level_state = False
     # shows mouse when this state is enabled
     use_mouse = False
     # only fill a part of the screen automatically, a rect
@@ -31,7 +35,7 @@ class AbstractGameState(metaclass=abc.ABCMeta):
         """
         print("Deactivated state", self.__class__.__name__)
         self.deactivated = True
-        if self.use_mouse and not self.game.vars["forced_mouse"]:
+        if self.use_mouse and not self.game.vars["forced_mouse"] and not self.game.top_state.use_mouse:
             pygame.mouse.set_visible(False)
     
     def pause(self):
@@ -42,7 +46,7 @@ class AbstractGameState(metaclass=abc.ABCMeta):
         """
         print("Paused state", self.__class__.__name__)
         self.paused = True
-        if self.use_mouse and not self.game.vars["forced_mouse"]:
+        if self.use_mouse and not self.game.vars["forced_mouse"] and not self.game.top_state.use_mouse:
             pygame.mouse.set_visible(False)
         
     def resume(self):

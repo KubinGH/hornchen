@@ -1,0 +1,17 @@
+{
+    "window_size": [780, 400],
+    "position": [122, 184],
+    "slots_start": [150, 212],
+    "slot_size": [44, 44],
+    "item_view_icon_pos": [564, 212],
+    "item_view_icon_size": [128, 128],
+    "item_view_font_size": 12,
+    "item_view_font_large_size": 20,
+    "item_view_name_pos": [540, 350],
+    "item_view_desc_pos": [700, 212],
+    "item_view_desc_width": 100,
+    "slots_gap": 4,
+    "slot_border_width": 6,
+    "slot_cols": 8,
+    "//": "slots rows is computed by math.ceil(slots_count / slot_cols), default: 32 / 8 = 4"
+}

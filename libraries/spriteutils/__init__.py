@@ -1,6 +1,11 @@
 import warnings
 
+enable_warnings = False
+
 assert __name__ != "__main__", "This script will not work correctly if run directly"
+
+if not enable_warnings:
+    warnings.warn = lambda *args, **kwargs: None
 
 use_cython = use_pyximport = use_python = False
 

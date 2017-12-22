@@ -8,7 +8,9 @@
         "pause_window": [312, 84],
         "buttons":  { 
             "return": [450, 120],
+            "save": [470, 160],
             "exit": [470, 540]
-        }
+        },
+        "save_message": [10, 50]
     }
 }

@@ -18,6 +18,7 @@ def ease_quintic_out(time, start_value, value_increase, total_time):
 def ease_circular_in(time, start_value, value_increase, total_time):
     return -value_increase * (math.sqrt(1 - (time / total_time) ** 2) - 1) + start_value
 
+
 def ease_value_sum(ease, start_value, value_increase, total_time):
     result = 0
     for time in range(total_time + 1):
@@ -36,6 +37,7 @@ def ease_value_sum_fm(ease, max_value, start_value, value_increase, total_time, 
             result += max_value - ease(time, start_value, value_increase, total_time)
     return result * app
 
+'''
 try:
     from libraries.easing import cyeasing
 except ImportError:
@@ -50,3 +52,4 @@ else:
         optimized[k] = locals()[k]
         locals()[k] = getattr(cyeasing, k)
     print("Done")
+'''

@@ -5,7 +5,7 @@ logfiles = True
 
 def main():
     if logfiles:
-        mainlog = open("log.txt", "w")
+        mainlog = open("log.txt", "w", encoding="utf-8")
         cprint = print
         def print_to_stdout_and_log_file(*args, **kwargs):
             cprint(*args, **kwargs)
@@ -23,7 +23,7 @@ def main():
     except Exception as e:
         traceback.print_exc()
         if logfiles:
-            with open("errorlog.txt", "w") as log:
+            with open("errorlog.txt", "w", encoding="utf-8") as log:
                 log.write(traceback.format_exc())
     finally:
         mainlog.close()

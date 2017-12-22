@@ -11,18 +11,18 @@ class PlayerInventory(BaseInventory):
 
     def handle_events(self, events, pressed_keys, mouse_pos):
         for item in self.slots:
-            if item is not self.empty_slot:
+            if item is not None:
                 item.handle_events(events, pressed_keys, mouse_pos)
 
     def update(self):
         for item in self.slots:
-            if item is not self.empty_slot:
+            if item is not None:
                 item.update()
 
     # Unused
     def draw_items(self, screen, pos_fix=(0, 0)):
         for item in self.slots:
-            if item is not self.empty_slot:
+            if item is not None:
                 item.draw(screen, pos_fix)
 
 

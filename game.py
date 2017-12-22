@@ -18,14 +18,16 @@ class GameEngine:
         "DEBUG": True,
         "screen": None, "draw_surface": None, "screen_size": None,
         "level_caches": {}, "map": None, 
-        "enable_fov": False, "forced_mouse": False,
-        "enable_enemy_hp_bars": True
+        "maze": None, "player_mazepos": None,
+        "enable_fov": False, "forced_mouse": True,
+        "enable_death": False
     }
     def __init__(self, **kwargs):
         self.vars = self.default_vars.copy()
         self.vars.update(kwargs)
         self.state_stack = []
-        self.ticks = 0
+        self.gticks = 0 # Global ticks
+        self.ticks = 0  # Game ticks, active playing time (not paused or in menus)
         self.player = None
         self.reset_game()
         self.push_state(MainMenuState(self, fade_in=True))
@@ -37,6 +39,7 @@ class GameEngine:
     def new_game(self):
         gen = mazegen.MazeGenerator(*self.vars["mapsize"])
         gen.create2()
+        gen.pprint(prettier=True)
         self.vars["maze"] = gen.data
         self.vars["player_mazepos"] = gen.start_pos
         self.vars["map"] = [[None for _ in range(gen.width)] for _ in range(gen.height)]
@@ -89,3 +92,36 @@ class GameEngine:
         b = pygame.mouse.set_visible(False)
         pygame.mouse.set_visible(b)
         return b
+
+    def create_save(self):
+        cache = {}
+
+        dstate = [s for s in self.state_stack if s.level_state]
+        # Save the current level into the cache
+        level_caches = self.vars["level_caches"]
+        if dstate:
+            level_caches = level_caches.copy()
+            current_level = dstate[0].level
+            level_caches[self.vars["player_mazepos"]] = current_level.create_cache()
+        cache["level_caches"] = level_caches
+
+        cache["player"] = self.player.create_cache()
+        cache["player_mazepos"] = self.vars["player_mazepos"]
+
+        cache["maze"], cache["map"] = self.vars["maze"], self.vars["map"]
+        cache["enable_fov"], cache["enable_death"] = self.vars["enable_fov"], self.vars["enable_death"]
+        cache["forced_mouse"] = self.vars["forced_mouse"]
+        cache["ticks"], cache["gticks"] = self.ticks, self.gticks
+
+        return cache
+
+    def load_save(self, cache):
+        self.ticks, self.gticks = cache["ticks"], cache["gticks"]
+        varkeys = [k for k in self.vars.keys() if k in cache and k not in ("player",)]
+        for key in varkeys:
+            self.vars[key] = cache[key]
+        self.player = PlayerCharacter(self)
+        self.player.load_cache(cache["player"])
+        mx, my = self.vars["player_mazepos"]
+        level =  self.vars["map"][my][mx].load_from_cache(self.vars["level_caches"][(mx, my)])
+        return level

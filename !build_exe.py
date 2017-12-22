@@ -3,7 +3,7 @@ import util.create_resource_zip
 
 def main(build_com="pyinstaller $launcher.pyw --onefile --name=Hornchen"):
     print("::Running pyinstaller::")
-    `os.system(build_com)
+    os.system(build_com)
     print("::Copying resources to archive::")
     util.create_resource_zip.create(os.getcwd(), minimize=True)
     print(":::Done:::")

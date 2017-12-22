@@ -1,3 +1,4 @@
+import math
 import functools
 import warnings, inspect # For outdated/unoptimal functions
 import pygame
@@ -5,7 +6,6 @@ from colors import Color
 from animation import Animation
 import zipopen
 
-PIXEL_ARRAY_EXISTS = "PixelArray" in dir(pygame)
 image_load = pygame.image.load # Needed for zip hook
 
 if zipopen.enable_resource_zip:
@@ -53,7 +53,7 @@ def simple_scale(surface, dwidth, dheight):
     return result
 
 scale_cache = {}
-def scale(surface, size, smooth=False, *, docache=True):
+def scale(surface, size, smooth=False, *, docache=True, dolog=True):
     size = tuple(size)
     params = (surface, size)
     if params not in scale_cache:
@@ -61,17 +61,17 @@ def scale(surface, size, smooth=False, *, docache=True):
         dw, dh = size[0] / surface_size[0], size[1] / surface_size[1]
         if dw == dh == 1:
             return surface
-        else:
+        if dolog:
             log("Scale image:", params)
-        if not smooth and (dw % 1 == dh % 1 == 0) and PIXEL_ARRAY_EXISTS:
-            scale_cache[params] = simple_scale(surface, int(dw), int(dh))
+        if not smooth and (dw % 1 == dh % 1 == 0):
+            result = simple_scale(surface, int(dw), int(dh))
         elif dw == dh == 2:
-            scale_cache[params] = pygame.transform.scale2x(surface)
+            result = pygame.transform.scale2x(surface)
         elif dw == dh and dw % 1 == 0 and (int(dw) & (int(dw) - 1)) == 0: # scale is a power of 2
-            scale_cache[params] = scale(pygame.transform.scale2x(surface), size)
+            result = scale(pygame.transform.scale2x(surface), size)
         else:
-            scale_cache[params] = pygame.transform.scale(surface, size)
-        result = scale_cache[params].convert_alpha()
+            result = pygame.transform.scale(surface, size)
+        result = result.convert_alpha()
         if not docache:
             return result
         scale_cache[params] = result 
@@ -126,7 +126,7 @@ class ColorBorderDrawer:
         self.color = color_as_tuple(self.color)
 
     def draw(self, surface, pos=(0, 0)):
-        width, height = surface.get_size()
+        width, height = self.size
         size, color, thickness = self.size, self.color, self.thickness
         rects = [pygame.Rect(pos[0], pos[1], width, thickness),
                  pygame.Rect(pos[0], pos[1] + height - thickness, width, thickness),
@@ -189,7 +189,7 @@ def image_border(size, image, nowarn=False):
             warnings.warn("Image in border doesn't fit perfectly")
         surface = pygame.Surface(size)
         drawer = ImageBorderDrawer(size, image)
-        surface.fill((3, 14, 15)) # Who could use such a color?
+        surface.fill((3, 14, 15)) # Who would use such a color?
         surface.set_colorkey((3, 14, 15))
         drawer.draw(surface)
         iborders_cache[params] = surface
@@ -229,3 +229,66 @@ def all_rotations(right):
     down = pygame.transform.rotate(right, -90)
     up = pygame.transform.flip(down, 0, 1)
     return ValueRotationDependent(right, left, up, down)
+
+
+dim_cache = {}
+def dim_surface(surface, alpha, color=Color.Black):
+    params = (surface, alpha)
+    if params not in dim_cache:
+        dimmer = pygame.Surface(surface.get_size()).convert_alpha()
+        dimmer.fill(color + (alpha, ))
+        result = surface.convert_alpha()
+        result.blit(dimmer, (0, 0))
+        dim_cache[params] = result
+    return dim_cache[params]
+
+# From a pygame tutorial, draws a proper outline... sometimes.
+def draw_circle(surface, color, pos, radius, width=0, it=150):
+    if width < 3:
+        pygame.draw.circle(surface, color, pos, int(radius), int(width))
+        return
+    center_x, center_y = pos
+    for i in range(it):
+        ang = i * math.pi * 2 / it
+        dx = int(math.cos(ang) * radius)
+        dy = int(math.sin(ang) * radius)
+        x = center_x + dx
+        y = center_y + dy
+        pygame.draw.circle(surface, color, (x, y), int(width))
+
+in_circle_cache = {}
+def in_circle(surface, border_width=0, border_color=Color.White):
+    params = (surface, border_width, border_color)
+    if params not in in_circle_cache:
+        result = surface.convert_alpha()
+        s = min(result.get_size())
+        center = result.get_rect().center
+        out = s * (1 - math.sqrt(2) / 2)
+        draw_circle(result, (0, 0, 0, 0), center, s * math.sqrt(2) / 2 + out / 2 - s // 10, out)
+        if border_width > 0:
+            pygame.draw.circle(result, border_color, center, s // 2, border_width)
+        in_circle_cache[params] = result
+    return in_circle_cache[params]
+
+rotate_cache = {}
+def rotate(surface, angle):
+    params = (surface, angle)
+    if params not in rotate_cache:
+        result = pygame.transform.rotate(surface, angle)
+        rotate_cache[params] = result
+    return rotate_cache[params]
+
+tint_cache = {}
+def tint(surface, color):
+    params = (surface, color)
+    if params not in tint_cache:
+        result = surface.copy()
+        result.fill(color, special_flags=pygame.BLEND_RGBA_MULT)
+        tint_cache[params] = result
+    return tint_cache[params]
+
+def apply_alpha(surface, alpha):
+    result = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+    result.fill((255, 255, 255, alpha))
+    result.blit(surface, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+    return result

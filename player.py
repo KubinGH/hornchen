@@ -339,7 +339,7 @@ class PlayerCharacter(BaseSprite):
 
         self.inventory.clear_items()
         for i, item_cache in cache["inventory"].items():
-            self.inventory.slots[i] = item_cache["type"].from_cache(self, item_cache)
+            self.inventory.slots[int(i)] = item_cache["type"].from_cache(self, item_cache)
 
         self.unlocked_spells.clear()
         for spelltype in cache["unlocked_spells"]:

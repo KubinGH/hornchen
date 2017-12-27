@@ -160,7 +160,7 @@ class App:
     def __init__(self, screen=None):
         self._screen = self.screen = screen
         self.console = gameconsole.GameConsole(self)
-        self.game = game.GameEngine(screen_size=WINDOW_SIZE, screen=self.screen, 
+        self.game = game.GameEngine(screen_size=WINDOW_SIZE, screen=self.screen,
                                     mapsize=MAP_SIZE, app=self)
         self.running = False
 
@@ -174,8 +174,8 @@ class App:
         dbgcolor = Color.Red
         def get_dbg_text_render(text):
             mtr = fontutils.get_multiline_text_render
-            return mtr(self.dbgfont, text, antialias=False, 
-                       color=dbgcolor, background=Color.Black, 
+            return mtr(self.dbgfont, text, antialias=False,
+                       color=dbgcolor, background=Color.Black,
                        dolog=False, cache=False)
         max_fps_vals = itertools.cycle((60, 0, 150))
         max_fps = next(max_fps_vals)
@@ -193,7 +193,7 @@ class App:
         console_enabled = False
         # Console functions
         def clear_caches():
-            get = lambda mod: [getattr(mod, c) for c in dir(mod) 
+            get = lambda mod: [getattr(mod, c) for c in dir(mod)
                                if c.endswith("_cache") and hasattr(getattr(mod, c), "clear")]
             for cache in get(imglib) + get(fontutils):
                 cache.clear()
@@ -370,7 +370,7 @@ class App:
                         # These are valid characters, and the user may need them
                         # otherwise e.g. shift+p=P may be muted and a pause may be created
                         # instead
-                        if not console_enabled: 
+                        if not console_enabled:
                             if event.key == pygame.K_f:
                                 act_max_fps = next(max_fps_vals)
                                 print("Set max FPS to", act_max_fps)
@@ -421,7 +421,7 @@ class App:
                 del profile
                 self.profile_update_tick = False
             self.total_update_time += update_time.value
-            
+
             # Draw
 
             if self.profile_draw_tick:
@@ -452,7 +452,7 @@ class App:
                 # Pathfinding tests
                 if isinstance(current_state, states.DungeonState):
                     levelfix = current_state.config["level_surface_position"]
-                    tile = current_state.config["tile_size"] 
+                    tile = current_state.config["tile_size"]
                     a1 = get_player().closest_tile_index
                     p2 = (mouse_pos[0] - levelfix[0], mouse_pos[1] - levelfix[1])
                     a2 = (round(p2[0] / tile), round(p2[1] / tile))
@@ -486,7 +486,7 @@ class App:
                                 _pc = len(_lvl.particles); _x, _y = get_player().rect.topleft;
                                 _xc, _yc = get_player().rect.center
                                 _xi, _yi = get_player().closest_tile_index
-                                dbg_text += dungeon_dbg_template.format(s=_s, f=_f, h=_h, p=_p, pc=_pc, 
+                                dbg_text += dungeon_dbg_template.format(s=_s, f=_f, h=_h, p=_p, pc=_pc,
                                                                         x=_x, y=_y, xc=_xc, yc=_yc, xi=_xi, yi=_yi)
                         if self.recording:
                             dbg_text += "(REC)\n"
@@ -509,7 +509,7 @@ class App:
             with TimeKeeper(screenupdate_time):
                 if self.enable_autoscale:
                     self._screen.fill(Color.Black)
-                    scaled = imglib.scale(self.screen, self._screen.get_size(), 
+                    scaled = imglib.scale(self.screen, self._screen.get_size(),
                                           docache=False, dolog=False)
                     self._screen.blit(scaled, (0, 0))
                 pygame.display.flip()
@@ -557,7 +557,6 @@ if __name__ == "__main__":
     if loading_text_shown:
         make_loading_text_fade_out()
     app = App(screen)
-    app.run()        
+    app.run()
     if PROFILE:
         profiler.stop(dump=True)
-

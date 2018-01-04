@@ -73,7 +73,7 @@ def dumps(dictionary, type_to_register_id=True, **kwargs):
     while stack:
         current = stack.pop()
         for key, value in current.items():
-            # Convert lists/tuples to their string represantations
+            # Convert lists/tuples to their string representations
             if isinstance(key, (list, tuple)):
                 del current[key]
                 current[str(key)] = value
